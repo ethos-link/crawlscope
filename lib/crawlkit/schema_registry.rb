@@ -75,6 +75,17 @@ module Crawlkit
       }
     }.freeze
 
+    IMAGE_OBJECT = {
+      type: "object",
+      required: ["@type"],
+      properties: {
+        "@type" => {const: "ImageObject"},
+        :url => {type: "string", format: "uri"},
+        :contentUrl => {type: "string", format: "uri"},
+        :thumbnail => {type: ["string", "object"]}
+      }
+    }.freeze
+
     OFFER = {
       type: "object",
       additionalProperties: true,
@@ -84,8 +95,14 @@ module Crawlkit
         :name => {type: ["string", "null"]},
         :price => {type: ["string", "number"]},
         :priceCurrency => {type: ["string", "null"]},
+        :priceSpecification => {type: ["object", "null"]},
         :availability => {type: "string"},
-        :url => {type: "string", format: "uri"}
+        :shippingDetails => {type: "object"},
+        :hasMerchantReturnPolicy => {type: "boolean"},
+        :merchantReturnPolicy => {type: "object"},
+        :url => {type: "string", format: "uri"},
+        :eligibleQuantity => {type: "object"},
+        :additionalProperty => {type: "array", items: {type: "object"}}
       }
     }.freeze
 
@@ -180,6 +197,30 @@ module Crawlkit
       }
     }.freeze
 
+    HOW_TO = {
+      type: "object",
+      required: ["@type", "name", "step"],
+      properties: {
+        "@type" => {const: "HowTo"},
+        :name => {type: "string"},
+        :description => {type: "string"},
+        :step => {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "object",
+            required: ["@type", "name", "text"],
+            properties: {
+              "@type" => {const: "HowToStep"},
+              :name => {type: "string"},
+              :text => {type: "string"},
+              :position => {type: "integer", minimum: 1}
+            }
+          }
+        }
+      }
+    }.freeze
+
     CONTACT_PAGE = {
       type: "object",
       required: ["@type", "name"],
@@ -197,6 +238,13 @@ module Crawlkit
       properties: {
         "@type" => {const: "Product"},
         :name => {type: "string"},
+        :image => {
+          anyOf: [
+            {type: "string", format: "uri"},
+            IMAGE_OBJECT,
+            {type: "array", items: {anyOf: [{type: "string", format: "uri"}, IMAGE_OBJECT]}}
+          ]
+        },
         :description => {type: "string"},
         :offers => {
           anyOf: [
@@ -204,6 +252,42 @@ module Crawlkit
             {type: "array", items: OFFER}
           ]
         }
+      }
+    }.freeze
+
+    RECIPE = {
+      type: "object",
+      required: ["@type", "name"],
+      properties: {
+        "@type" => {const: "Recipe"},
+        :name => {type: "string"},
+        :image => {type: ["string", "array"]},
+        :recipeIngredient => {type: "array", items: {type: "string"}},
+        :recipeInstructions => {type: ["string", "array"]}
+      }
+    }.freeze
+
+    EVENT = {
+      type: "object",
+      required: ["@type", "name", "startDate"],
+      properties: {
+        "@type" => {const: "Event"},
+        :name => {type: "string"},
+        :startDate => {type: "string", format: "date-time"},
+        :endDate => {type: "string", format: "date-time"},
+        :location => {type: "object"}
+      }
+    }.freeze
+
+    VIDEO_OBJECT = {
+      type: "object",
+      required: ["@type", "name", "description"],
+      properties: {
+        "@type" => {const: "VideoObject"},
+        :name => {type: "string"},
+        :description => {type: "string"},
+        :thumbnailUrl => {type: "string", format: "uri"},
+        :uploadDate => {type: "string", format: "date-time"}
       }
     }.freeze
 
@@ -262,11 +346,15 @@ module Crawlkit
           "Organization" => ORGANIZATION,
           "SoftwareApplication" => SOFTWARE_APPLICATION,
           "WebApplication" => WEB_APPLICATION,
+          "HowTo" => HOW_TO,
           "ContactPage" => CONTACT_PAGE,
           "Product" => PRODUCT,
           "Review" => REVIEW,
           "WebSite" => WEBSITE,
           "BreadcrumbList" => BREADCRUMB_LIST,
+          "Recipe" => RECIPE,
+          "Event" => EVENT,
+          "VideoObject" => VIDEO_OBJECT,
           "WebPage" => WEB_PAGE
         }
       )

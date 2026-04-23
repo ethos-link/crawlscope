@@ -5,6 +5,8 @@
 
 `crawlkit` is a small Ruby gem for sitemap-driven SEO validation.
 
+It is built by [Ethos Link](https://www.ethos-link.com) and used in production by [Reviato](https://www.reviato.com).
+
 It is designed for Rails apps and plain Ruby scripts that want:
 
 - deterministic sitemap crawling
@@ -315,4 +317,7 @@ MIT License, see [LICENSE.txt](LICENSE.txt)
 
 ## About
 
-Made by the team at [Ethos Link](https://www.ethos-link.com) — practical software for growing businesses.
+Made by the team at [Ethos Link](https://www.ethos-link.com) — practical software for growing businesses. We build tools for hospitality operators who need clear workflows, fast onboarding, and real human support.
+
+We also build [Reviato](https://www.reviato.com), “Capture. Interpret. Act.”.
+Turn guest feedback into clear next steps for your team. Collect private appraisals, spot patterns across reviews, and act before small issues turn into public ones.
