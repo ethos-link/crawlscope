@@ -5,16 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2026-04-23
+## [0.1.0] - 2026-04-23
 
 
 ### Added
 
-- add crawlscope release-ready audit gem
+- add crawlkit release-ready audit gem
 
 - add standalone validation commands
 
-- move default schema rules into crawlscope
+- move default schema rules into crawlkit
 
 
 
@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - strengthen public API coverage
 
 - load shared test dependencies
+
+- rename crawlkit to crawlscope
 
 
 
