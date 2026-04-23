@@ -23,6 +23,20 @@ module Crawlscope
       url.to_s
     end
 
+    def normalize_for_base(url, base_url:)
+      uri = URI.parse(normalize(url, base_url: base_url))
+      base_uri = URI.parse(base_url.to_s)
+      unless base_uri.host.to_s.empty?
+        uri.scheme = base_uri.scheme
+        uri.host = base_uri.host
+        uri.port = base_uri.port
+      end
+
+      normalize(uri.to_s, base_url: base_url)
+    rescue URI::InvalidURIError
+      url.to_s
+    end
+
     def path(url)
       uri = URI.parse(url.to_s)
       value = uri.path.to_s
