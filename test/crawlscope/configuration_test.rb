@@ -73,4 +73,22 @@ class CrawlscopeConfigurationTest < Minitest::Test
     assert_equal 9, config.timeout_seconds
     refute config.scroll_page?
   end
+
+  def test_renderer_must_be_supported
+    config = Crawlscope::Configuration.new
+    config.renderer = "webkit"
+
+    error = assert_raises(Crawlscope::ConfigurationError) { config.renderer }
+
+    assert_equal "Crawlscope renderer must be http or browser", error.message
+  end
+
+  def test_numeric_values_must_be_positive_integers
+    config = Crawlscope::Configuration.new
+    config.concurrency = "0"
+
+    error = assert_raises(Crawlscope::ConfigurationError) { config.concurrency }
+
+    assert_equal "Crawlscope concurrency must be an integer >= 1", error.message
+  end
 end

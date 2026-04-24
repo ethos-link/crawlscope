@@ -15,7 +15,7 @@ module Crawlscope
 
       urls.each do |url|
         pool.post do
-          pages << @page_fetcher.fetch(url)
+          pages << fetch(url)
         end
       end
 
@@ -23,6 +23,24 @@ module Crawlscope
       pool.wait_for_termination
 
       pages.to_a
+    end
+
+    private
+
+    def fetch(url)
+      @page_fetcher.fetch(url)
+    rescue => error
+      Page.new(
+        url: url,
+        normalized_url: Url.normalize(url, base_url: url),
+        final_url: url,
+        normalized_final_url: Url.normalize(url, base_url: url),
+        status: nil,
+        headers: {},
+        body: nil,
+        doc: nil,
+        error: "#{error.class}: #{error.message}"
+      )
     end
   end
 end

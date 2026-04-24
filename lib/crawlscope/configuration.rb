@@ -7,6 +7,7 @@ module Crawlscope
     DEFAULT_BROWSER_NETWORK_IDLE_TIMEOUT_SECONDS = 5
     DEFAULT_BROWSER_SCROLL_PAGE = true
     DEFAULT_CONCURRENCY = 10
+    RENDERERS = %i[http browser].freeze
     DEFAULT_TIMEOUT_SECONDS = 20
 
     attr_writer :allowed_statuses, :base_url, :browser_factory, :concurrency, :network_idle_timeout_seconds, :output, :renderer, :rule_registry, :schema_registry, :scroll_page, :site_name, :sitemap_path, :timeout_seconds
@@ -26,7 +27,7 @@ module Crawlscope
 
     def concurrency
       value = resolve(@concurrency)
-      value.nil? ? DEFAULT_CONCURRENCY : value.to_i
+      positive_integer(value, default: DEFAULT_CONCURRENCY, name: "concurrency")
     end
 
     def browser_concurrency
@@ -42,7 +43,7 @@ module Crawlscope
 
     def network_idle_timeout_seconds
       value = resolve(@network_idle_timeout_seconds)
-      value.nil? ? DEFAULT_BROWSER_NETWORK_IDLE_TIMEOUT_SECONDS : value.to_i
+      positive_integer(value, default: DEFAULT_BROWSER_NETWORK_IDLE_TIMEOUT_SECONDS, name: "network_idle_timeout_seconds")
     end
 
     def output
@@ -55,7 +56,10 @@ module Crawlscope
       normalized_value = value.to_s.strip
       normalized_value = "http" if normalized_value.empty?
 
-      normalized_value.to_sym
+      renderer = normalized_value.to_sym
+      return renderer if RENDERERS.include?(renderer)
+
+      raise ConfigurationError, "Crawlscope renderer must be http or browser"
     end
 
     def rule_registry
@@ -111,13 +115,24 @@ module Crawlscope
 
     def timeout_seconds
       value = resolve(@timeout_seconds)
-      value.nil? ? DEFAULT_TIMEOUT_SECONDS : value.to_i
+      positive_integer(value, default: DEFAULT_TIMEOUT_SECONDS, name: "timeout_seconds")
     end
 
     private
 
     def resolve(value)
       value.respond_to?(:call) ? value.call : value
+    end
+
+    def positive_integer(value, default:, name:)
+      return default if value.nil?
+
+      integer = value.is_a?(Integer) ? value : Integer(value, 10)
+      raise ArgumentError if integer < 1
+
+      integer
+    rescue ArgumentError, TypeError
+      raise ConfigurationError, "Crawlscope #{name} must be an integer >= 1"
     end
   end
 end

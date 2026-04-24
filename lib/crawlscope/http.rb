@@ -43,7 +43,7 @@ module Crawlscope
         body: body,
         doc: doc
       )
-    rescue => error
+    rescue Faraday::Error, SocketError, SystemCallError, Timeout::Error => error
       Page.new(
         url: url,
         normalized_url: Url.normalize(url, base_url: @base_url),

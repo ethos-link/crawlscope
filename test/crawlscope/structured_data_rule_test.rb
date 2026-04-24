@@ -59,6 +59,26 @@ class CrawlscopeStructuredDataRuleTest < Minitest::Test
     assert_equal [:structured_data_parse_error], issues.to_a.map(&:code)
   end
 
+  def test_reports_missing_structured_data_for_html_pages
+    issues = Crawlscope::IssueCollection.new
+    rule = Crawlscope::Rules::StructuredData.new
+    page = page(
+      url: "https://example.com/articles/test",
+      body: "<html><body><main><h1>Article</h1></main></body></html>"
+    )
+
+    rule.call(
+      urls: [page.url],
+      pages: [page],
+      issues: issues,
+      context: {schema_registry: Crawlscope::SchemaRegistry.default}
+    )
+
+    assert_equal [:missing_structured_data], issues.to_a.map(&:code)
+    assert_equal "no structured data found; add JSON-LD or microdata markup", issues.to_a.first.message
+    assert_equal ["json-ld", "microdata"], issues.to_a.first.details[:expected_sources]
+  end
+
   private
 
   def page(url:, body:)

@@ -161,7 +161,9 @@ bundle exec rake crawlscope:validate:metadata URL=https://example.com
 bundle exec rake crawlscope:validate:ldjson URL=https://example.com/article
 ```
 
-`URL` is the site base for `crawlscope:validate`. Without `SITEMAP`, Crawlscope uses `/sitemap.xml`. With `SITEMAP`, Crawlscope uses `URL` as the site base and validates URLs from that sitemap. `SITEMAP` may be a full URL or a local file path.
+`crawlscope:validate` runs all default sitemap rules: metadata, structured data, uniqueness, and links. `URL` is the site base. Without `SITEMAP`, Crawlscope uses `/sitemap.xml`. With `SITEMAP`, Crawlscope uses `URL` as the site base and validates URLs from that sitemap. `SITEMAP` may be a full URL or a local file path.
+
+`crawlscope:validate:ldjson` is separate because it directly checks the URL or semicolon-separated URLs in `URL`; it does not crawl the sitemap.
 
 ### Structured Data URL Audit
 
@@ -177,7 +179,7 @@ Optional flags:
 
 - `DEBUG=1`: print detected items
 - `SUMMARY=1`: print grouped failures
-- `REPORT_PATH=...`: write a JSON report
+- `REPORT_PATH=...`: write a JSON report. Treat this as trusted operator input; Crawlscope writes to the path the task process can access.
 - `JS=1` or `RENDERER=browser`: render with Ferrum
 
 ## Rules

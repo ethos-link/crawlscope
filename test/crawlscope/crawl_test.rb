@@ -33,6 +33,9 @@ class CrawlscopeCrawlTest < Minitest::Test
               <title>Pricing</title>
               <meta name="description" content="Plans for hotels and restaurants">
               <link rel="canonical" href="https://example.com/pricing">
+              <script type="application/ld+json">
+                {"@context":"https://schema.org","@type":"WebSite","name":"Example","url":"https://example.com"}
+              </script>
             </head>
             <body>
               <main>
@@ -92,7 +95,7 @@ class CrawlscopeCrawlTest < Minitest::Test
     ).call
 
     refute result.ok?
-    assert_equal %i[meta_description_too_long missing_canonical missing_h1 title_repeats_site_name].sort, result.issues.to_a.map(&:code).uniq.sort
+    assert_equal %i[meta_description_too_long missing_canonical missing_h1 missing_structured_data title_repeats_site_name].sort, result.issues.to_a.map(&:code).uniq.sort
   end
 
   def test_uses_browser_when_renderer_is_browser
@@ -127,6 +130,9 @@ class CrawlscopeCrawlTest < Minitest::Test
               <title>Pricing</title>
               <meta name="description" content="Plans for hotels and restaurants">
               <link rel="canonical" href="https://example.com/pricing">
+              <script type="application/ld+json">
+                {"@context":"https://schema.org","@type":"WebSite","name":"Example","url":"https://example.com"}
+              </script>
             </head>
             <body>
               <main>

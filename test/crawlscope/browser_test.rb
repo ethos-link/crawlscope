@@ -104,14 +104,25 @@ class CrawlscopeBrowserTest < Minitest::Test
   def test_fetch_returns_error_page_when_navigation_fails
     page = Object.new
     def page.network
-      raise "browser failed"
+      raise Timeout::Error, "browser failed"
     end
 
     result = browser_with(page: page).fetch("https://example.com/start")
 
     assert_equal "https://example.com/start", result.final_url
     assert_nil result.status
-    assert_equal "RuntimeError: browser failed", result.error
+    assert_equal "Timeout::Error: browser failed", result.error
+  end
+
+  def test_fetch_reraises_programmer_errors
+    page = Object.new
+    def page.network
+      raise NoMethodError, "bad call"
+    end
+
+    browser = browser_with(page: page)
+
+    assert_raises(NoMethodError) { browser.fetch("https://example.com/start") }
   end
 
   def test_close_quits_browser

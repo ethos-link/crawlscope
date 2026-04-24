@@ -49,7 +49,7 @@ class CrawlscopeLinksRuleTest < Minitest::Test
     issues = Crawlscope::IssueCollection.new
 
     Crawlscope::Rules::Links.new.call(
-      urls: ["https://example.com/guide"],
+      urls: [],
       pages: [page(url: "https://example.com/guide", body: "<main><a href=\"/unknown\">Unknown</a></main>")],
       issues: issues,
       context: context(resolver: ->(_target_url) {})
@@ -57,6 +57,48 @@ class CrawlscopeLinksRuleTest < Minitest::Test
 
     assert_includes issues.to_a.map(&:code), :unresolved_internal_link
     assert_includes issues.to_a.find { |issue| issue.code == :unresolved_internal_link }.message, "unable to validate internal link"
+  end
+
+  def test_ignores_fetch_errors_for_urls_already_crawled
+    issues = Crawlscope::IssueCollection.new
+    resolver = lambda do |target_url|
+      {
+        crawled: true,
+        error: "Timeout::Error: timed out",
+        final_url: target_url,
+        status: nil
+      }
+    end
+
+    Crawlscope::Rules::Links.new.call(
+      urls: [],
+      pages: [page(url: "https://example.com/guide", body: "<main><a href=\"/timeout\">Timeout</a></main>")],
+      issues: issues,
+      context: context(resolver: resolver)
+    )
+
+    assert_empty issues.to_a
+  end
+
+  def test_reports_fetch_errors_for_uncrawled_targets
+    issues = Crawlscope::IssueCollection.new
+    resolver = lambda do |target_url|
+      {
+        crawled: false,
+        error: "Timeout::Error: timed out",
+        final_url: target_url,
+        status: nil
+      }
+    end
+
+    Crawlscope::Rules::Links.new.call(
+      urls: [],
+      pages: [page(url: "https://example.com/guide", body: "<main><a href=\"/timeout\">Timeout</a></main>")],
+      issues: issues,
+      context: context(resolver: resolver)
+    )
+
+    assert_equal [:unresolved_internal_link], issues.to_a.map(&:code)
   end
 
   def test_reports_low_inbound_anchor_links

@@ -45,6 +45,8 @@ module Crawlscope
         doc: Nokogiri::HTML(body)
       )
     rescue => error
+      raise unless browser_error?(error)
+
       Page.new(
         url: url,
         normalized_url: Url.normalize(url, base_url: @base_url),
@@ -83,6 +85,12 @@ module Crawlscope
       @page.network.wait_for_idle(duration: 0.5, timeout: @network_idle_timeout_seconds)
     rescue Ferrum::TimeoutError
       raise Timeout::Error, "Timed out waiting for browser network idle"
+    end
+
+    def browser_error?(error)
+      error.is_a?(Timeout::Error) ||
+        error.is_a?(SystemCallError) ||
+        error.class.name.to_s.start_with?("Ferrum::")
     end
   end
 end

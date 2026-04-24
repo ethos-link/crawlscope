@@ -1,44 +1,33 @@
 namespace :crawlscope do
-  desc "Validate URLs with the default Crawlscope rules. ENV: URL, SITEMAP, RULES, JS=1, TIMEOUT, NETWORK_IDLE_TIMEOUT, CONCURRENCY"
+  desc "Validate URLs with all default Crawlscope rules. ENV: URL, SITEMAP, RULES, JS=1, TIMEOUT, NETWORK_IDLE_TIMEOUT, CONCURRENCY"
   task validate: :environment do
-    status = Crawlscope::Cli.start(["validate"], out: $stdout, err: $stderr)
-    exit(status) unless status.zero?
+    Crawlscope::RakeTasks.validate
   end
 
   namespace :validate do
-    desc "Validate JSON-LD on one or more URLs. ENV: URL (required, semicolon-separated), DEBUG=1, JS=1, TIMEOUT, NETWORK_IDLE_TIMEOUT, REPORT_PATH, SUMMARY=1"
+    desc "Directly validate JSON-LD on one or more URLs. ENV: URL (required, semicolon-separated), DEBUG=1, JS=1, TIMEOUT, NETWORK_IDLE_TIMEOUT, REPORT_PATH, SUMMARY=1"
     task ldjson: :environment do
-      status = Crawlscope::Cli.start(["ldjson"], out: $stdout, err: $stderr)
-      exit(status) unless status.zero?
+      Crawlscope::RakeTasks.ldjson
     end
 
     desc "Validate URLs with the metadata rule. ENV: URL, SITEMAP, JS=1"
     task metadata: :environment do
-      crawlscope_task_with_rules("metadata")
+      Crawlscope::RakeTasks.validate_rule("metadata")
     end
 
-    desc "Validate URLs with the structured_data rule. ENV: URL, SITEMAP, JS=1"
+    desc "Validate sitemap URLs with the structured_data rule. ENV: URL, SITEMAP, JS=1"
     task structured_data: :environment do
-      crawlscope_task_with_rules("structured_data")
+      Crawlscope::RakeTasks.validate_rule("structured_data")
     end
 
     desc "Validate URLs with the uniqueness rule. ENV: URL, SITEMAP, JS=1"
     task uniqueness: :environment do
-      crawlscope_task_with_rules("uniqueness")
+      Crawlscope::RakeTasks.validate_rule("uniqueness")
     end
 
     desc "Validate URLs with the links rule. ENV: URL, SITEMAP, JS=1"
     task links: :environment do
-      crawlscope_task_with_rules("links")
+      Crawlscope::RakeTasks.validate_rule("links")
     end
-  end
-
-  def crawlscope_task_with_rules(rules)
-    original_rules = ENV["RULES"]
-    ENV["RULES"] = rules
-    status = Crawlscope::Cli.start(["validate"], out: $stdout, err: $stderr)
-    exit(status) unless status.zero?
-  ensure
-    ENV["RULES"] = original_rules
   end
 end

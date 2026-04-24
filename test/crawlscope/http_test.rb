@@ -43,4 +43,14 @@ class CrawlscopeHttpTest < Minitest::Test
     assert_includes page.error, "Faraday::ConnectionFailed"
     assert_equal "https://example.com/down", page.final_url
   end
+
+  def test_fetch_reraises_programmer_errors
+    http = Crawlscope::Http.new(base_url: "https://example.com", timeout_seconds: 2)
+
+    def http.connection
+      raise NoMethodError, "bad call"
+    end
+
+    assert_raises(NoMethodError) { http.fetch("https://example.com/down") }
+  end
 end

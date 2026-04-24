@@ -40,41 +40,49 @@ module Crawlscope
       end
 
       def extract_links(pages)
-        links = []
+        pages.select(&:html?).flat_map { |page| page_links(page) }
+      end
 
-        pages.each do |page|
-          next unless page.html?
+      def page_links(page)
+        source_path = Url.path(page.normalized_url)
+        return [] unless crawlable_path?(source_path)
 
-          source_path = Url.path(page.normalized_url)
-          next if source_path.nil?
-
-          contextual_links(page.doc).each do |node|
-            href = node["href"].to_s.strip
-            next if href.empty?
-            next if href.start_with?("#")
-            next if LINK_SCHEMES_TO_SKIP.any? { |prefix| href.start_with?(prefix) }
-
-            anchor_text = normalize_anchor_text(node.text)
-            next if anchor_text.empty?
-
-            target_url = normalize_internal_link(page.normalized_url, href)
-            next if target_url.nil?
-
-            target_path = Url.path(target_url)
-            next if target_path.nil?
-            next if skip_internal_path?(target_path)
-
-            links << {
-              anchor_text: anchor_text,
-              source_path: source_path,
-              source_url: page.normalized_url,
-              target_path: target_path,
-              target_url: target_url
-            }
-          end
+        contextual_links(page.doc).filter_map do |node|
+          link_for(page: page, source_path: source_path, node: node)
         end
+      end
 
-        links
+      def link_for(page:, source_path:, node:)
+        href = node["href"].to_s.strip
+        return unless crawlable_href?(href)
+
+        anchor_text = normalize_anchor_text(node.text)
+        return if anchor_text.empty?
+
+        target_url = normalize_internal_link(page.normalized_url, href)
+        return if target_url.nil?
+
+        target_path = Url.path(target_url)
+        return unless crawlable_path?(target_path)
+
+        {
+          anchor_text: anchor_text,
+          source_path: source_path,
+          source_url: page.normalized_url,
+          target_path: target_path,
+          target_url: target_url
+        }
+      end
+
+      def crawlable_href?(href)
+        return false if href.empty?
+        return false if href.start_with?("#")
+
+        LINK_SCHEMES_TO_SKIP.none? { |prefix| href.start_with?(prefix) }
+      end
+
+      def crawlable_path?(path)
+        !path.nil? && !skip_internal_path?(path)
       end
 
       def normalize_anchor_text(text)
@@ -122,37 +130,62 @@ module Crawlscope
         resolved_links = []
 
         links.group_by { |link| link[:target_url] }.each do |target_url, grouped_links|
-          resolution = @resolve_target.call(target_url)
-          if resolution.nil?
-            report_unresolved_target(target_url, grouped_links, issues, resolution)
+          target = resolve_target(target_url)
+
+          if target.unresolved?
+            report_unresolved_target(target_url, grouped_links, issues, target.resolution)
             next
           end
 
-          status = resolution[:status]
-
-          if status.nil?
-            next if resolution[:crawled] && resolution[:error]
-
-            report_unresolved_target(target_url, grouped_links, issues, resolution)
+          if target.ignored_error?
             next
           end
 
-          unless @allowed_statuses.include?(status)
-            report_broken_target(target_url, grouped_links, issues, status)
+          unless target.allowed?(@allowed_statuses)
+            report_broken_target(target_url, grouped_links, issues, target.status)
             next
           end
 
-          final_url = resolution[:final_url].to_s.empty? ? target_url : resolution[:final_url]
-          final_path = Url.path(final_url)
-          next if final_path.nil?
-          next if skip_internal_path?(final_path)
+          next unless crawlable_path?(target.final_path)
 
           grouped_links.each do |link|
-            resolved_links << link.merge(final_path: final_path, final_url: final_url)
+            resolved_links << link.merge(final_path: target.final_path, final_url: target.final_url)
           end
         end
 
         resolved_links
+      end
+
+      def resolve_target(target_url)
+        resolution = @resolve_target.call(target_url)
+        LinkTarget.new(target_url: target_url, resolution: resolution)
+      end
+
+      LinkTarget = Data.define(:target_url, :resolution) do
+        def allowed?(statuses)
+          statuses.include?(status)
+        end
+
+        def final_path
+          Url.path(final_url)
+        end
+
+        def final_url
+          value = resolution[:final_url].to_s
+          value.empty? ? target_url : value
+        end
+
+        def ignored_error?
+          resolution && status.nil? && resolution[:crawled] && resolution[:error]
+        end
+
+        def status
+          resolution && resolution[:status]
+        end
+
+        def unresolved?
+          resolution.nil? || (status.nil? && !ignored_error?)
+        end
       end
 
       def skip_internal_path?(path)

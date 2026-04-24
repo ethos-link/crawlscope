@@ -23,8 +23,21 @@ module Crawlscope
 
       def validate_page(page, issues, schema_registry)
         document = Crawlscope::StructuredData::Document.new(html: page.body)
+        items = document.items
 
-        document.items.each do |item|
+        if items.empty?
+          issues.add(
+            code: :missing_structured_data,
+            severity: :warning,
+            category: :structured_data,
+            url: page.url,
+            message: "no structured data found; add JSON-LD or microdata markup",
+            details: {expected_sources: ["json-ld", "microdata"]}
+          )
+          return
+        end
+
+        items.each do |item|
           data = item.data
           source = item.source
 
