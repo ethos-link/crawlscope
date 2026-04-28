@@ -105,6 +105,7 @@ module Crawlscope
       parser.parse!(@argv)
 
       urls = options[:urls].map(&:strip).reject(&:empty?)
+      urls = default_urls if urls.empty?
       raise ConfigurationError, "Crawlscope URL is not configured" if urls.empty?
 
       configure_renderer(options[:renderer])
@@ -236,6 +237,10 @@ module Crawlscope
       return [] if raw_urls.nil?
 
       raw_urls.split(";").map(&:strip).reject(&:empty?)
+    end
+
+    def default_urls
+      [normalized_string(@configuration.base_url) || "http://localhost:3000"]
     end
 
     def task

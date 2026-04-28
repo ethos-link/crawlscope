@@ -5,7 +5,7 @@ namespace :crawlscope do
   end
 
   namespace :validate do
-    desc "Directly validate JSON-LD on one or more URLs. ENV: URL (required, semicolon-separated), DEBUG=1, JS=1, TIMEOUT, NETWORK_IDLE_TIMEOUT, REPORT_PATH, SUMMARY=1"
+    desc "Directly validate JSON-LD on one or more URLs. ENV: URL (semicolon-separated), DEBUG=1, JS=1, TIMEOUT, NETWORK_IDLE_TIMEOUT, REPORT_PATH, SUMMARY=1"
     task ldjson: :environment do
       Crawlscope::RakeTasks.ldjson
     end

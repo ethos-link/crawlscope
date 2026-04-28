@@ -150,7 +150,7 @@ bin/rails crawlscope:validate:metadata
 bin/rails crawlscope:validate:structured_data
 bin/rails crawlscope:validate:uniqueness
 bin/rails crawlscope:validate:links
-bin/rails crawlscope:validate:ldjson URL=https://example.com/article
+bin/rails crawlscope:validate:ldjson
 ```
 
 The same validation surface is also available in the gem repository itself through plain `rake`:
@@ -163,7 +163,7 @@ bundle exec rake crawlscope:validate:ldjson URL=https://example.com/article
 
 `crawlscope:validate` runs all default sitemap rules: metadata, structured data, uniqueness, and links. `URL` is the site base. Without `SITEMAP`, Crawlscope uses `/sitemap.xml`. With `SITEMAP`, Crawlscope uses `URL` as the site base and validates URLs from that sitemap. `SITEMAP` may be a full URL or a local file path.
 
-`crawlscope:validate:ldjson` is separate because it directly checks the URL or semicolon-separated URLs in `URL`; it does not crawl the sitemap.
+`crawlscope:validate:ldjson` is separate because it directly checks the URL or semicolon-separated URLs in `URL`; it does not crawl the sitemap. Without `URL`, it checks the configured base URL, falling back to `http://localhost:3000`.
 
 ### Structured Data URL Audit
 

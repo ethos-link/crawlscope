@@ -4,9 +4,10 @@ require "test_helper"
 
 class CrawlscopeCliTest < Minitest::Test
   class FakeConfiguration
-    attr_accessor :concurrency, :network_idle_timeout_seconds, :output, :renderer, :timeout_seconds
+    attr_accessor :base_url, :concurrency, :network_idle_timeout_seconds, :output, :renderer, :timeout_seconds
 
     def initialize
+      @base_url = nil
       @concurrency = 10
       @network_idle_timeout_seconds = 5
       @renderer = :http
@@ -145,6 +146,17 @@ class CrawlscopeCliTest < Minitest::Test
     assert_empty err.string
   end
 
+  def test_ldjson_defaults_to_configured_base_url
+    configuration = FakeConfiguration.new
+    configuration.base_url = "https://example.com"
+    task = FakeTask.new
+
+    status = Crawlscope::Cli.start(["ldjson"], out: StringIO.new, err: StringIO.new, configuration: configuration, task: task)
+
+    assert_equal 0, status
+    assert_equal ["https://example.com"], task.json_ld_arguments[:urls]
+  end
+
   def test_validate_caps_default_browser_concurrency
     configuration = FakeConfiguration.new
     task = FakeTask.new
@@ -218,14 +230,16 @@ class CrawlscopeCliTest < Minitest::Test
     assert_equal 3, configuration.network_idle_timeout_seconds
   end
 
-  def test_ldjson_requires_urls
+  def test_ldjson_defaults_to_localhost
     out = StringIO.new
     err = StringIO.new
+    task = FakeTask.new
 
-    status = Crawlscope::Cli.start(["ldjson"], out: out, err: err, configuration: FakeConfiguration.new, task: FakeTask.new)
+    status = Crawlscope::Cli.start(["ldjson"], out: out, err: err, configuration: FakeConfiguration.new, task: task)
 
-    assert_equal 1, status
-    assert_includes err.string, "Crawlscope URL is not configured"
+    assert_equal 0, status
+    assert_equal ["http://localhost:3000"], task.json_ld_arguments[:urls]
+    assert_empty err.string
   end
 
   def test_invalid_integer_option_returns_error
