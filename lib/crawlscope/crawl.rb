@@ -81,6 +81,8 @@ module Crawlscope
           issues.add(code: :fetch_failed, severity: :error, category: :crawl, url: page.url, message: page.error, details: {})
         elsif !@allowed_statuses.include?(page.status)
           issues.add(code: :unexpected_status, severity: :error, category: :crawl, url: page.url, message: "HTTP #{page.status}", details: {status: page.status})
+        elsif redirected?(page)
+          issues.add(code: :redirected_page, severity: :warning, category: :crawl, url: page.url, message: "redirects to #{page.final_url}", details: {final_url: page.final_url, status: page.status})
         end
       end
     end
@@ -127,6 +129,10 @@ module Crawlscope
         final_url: page.normalized_final_url || normalized_url,
         status: page.status
       }
+    end
+
+    def redirected?(page)
+      page.normalized_url.to_s != page.normalized_final_url.to_s
     end
   end
 end
