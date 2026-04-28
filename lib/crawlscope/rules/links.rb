@@ -5,7 +5,7 @@ require "uri"
 module Crawlscope
   module Rules
     class Links
-      CONTEXTUAL_LINK_SELECTORS = "main a[href], article a[href]"
+      LINK_SELECTORS = "a[href]"
       INTERNAL_PATH_PREFIXES_TO_SKIP = ["/rails/", "/cdn-cgi/"].freeze
       LINK_SCHEMES_TO_SKIP = ["mailto:", "tel:", "javascript:", "data:"].freeze
       MAX_SOURCES_IN_ERROR = 3
@@ -33,10 +33,7 @@ module Crawlscope
       private
 
       def contextual_links(doc)
-        links = doc.css(CONTEXTUAL_LINK_SELECTORS)
-        return links unless links.empty?
-
-        doc.css("a[href]")
+        doc.css(LINK_SELECTORS)
       end
 
       def extract_links(pages)
@@ -45,7 +42,7 @@ module Crawlscope
 
       def page_links(page)
         source_path = Url.path(page.normalized_url)
-        return [] unless crawlable_path?(source_path)
+        return [] unless crawlable_source_path?(source_path)
 
         contextual_links(page.doc).filter_map do |node|
           link_for(page: page, source_path: source_path, node: node)
@@ -146,6 +143,7 @@ module Crawlscope
             next
           end
 
+          report_redirect_target(target_url, grouped_links, issues, target) if target.redirect?
           next unless crawlable_path?(target.final_path)
 
           grouped_links.each do |link|
@@ -154,6 +152,18 @@ module Crawlscope
         end
 
         resolved_links
+      end
+
+      def report_redirect_target(target_url, grouped_links, issues, target)
+        source_urls = grouped_links.map { |link| link[:source_url] }.uniq.first(MAX_SOURCES_IN_ERROR)
+        issues.add(
+          code: :internal_link_redirects,
+          severity: :warning,
+          category: :links,
+          url: target_url,
+          message: "internal link redirects to #{target.final_url} (sources: #{source_urls.join(", ")})",
+          details: {final_url: target.final_url, source_urls: source_urls, status: target.status}
+        )
       end
 
       def resolve_target(target_url)
@@ -183,9 +193,17 @@ module Crawlscope
           resolution && resolution[:status]
         end
 
+        def redirect?
+          (status && (300..399).cover?(status.to_i)) || final_url != target_url
+        end
+
         def unresolved?
           resolution.nil? || (status.nil? && !ignored_error?)
         end
+      end
+
+      def crawlable_source_path?(path)
+        !path.nil? && INTERNAL_PATH_PREFIXES_TO_SKIP.none? { |prefix| path.start_with?(prefix) }
       end
 
       def skip_internal_path?(path)

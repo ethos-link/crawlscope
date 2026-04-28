@@ -118,6 +118,45 @@ class CrawlscopeLinksRuleTest < Minitest::Test
     assert_equal "https://example.com/guide", issues.to_a.first.url
   end
 
+  def test_counts_root_page_links_as_inbound_links
+    issues = Crawlscope::IssueCollection.new
+
+    Crawlscope::Rules::Links.new.call(
+      urls: ["https://example.com/", "https://example.com/about"],
+      pages: [
+        page(url: "https://example.com/", body: "<main><a href=\"/about\">About</a></main>"),
+        page(url: "https://example.com/about", body: "<main><p>About</p></main>")
+      ],
+      issues: issues,
+      context: context(resolver: ->(target_url) { {crawled: true, error: nil, final_url: target_url, status: 200} })
+    )
+
+    refute_includes issues.to_a.map(&:code), :low_inbound_anchor_links
+  end
+
+  def test_reports_internal_links_that_redirect
+    issues = Crawlscope::IssueCollection.new
+    resolver = lambda do |target_url|
+      {
+        crawled: false,
+        error: nil,
+        final_url: "https://example.com/pricing",
+        status: 200
+      }
+    end
+
+    Crawlscope::Rules::Links.new.call(
+      urls: ["https://example.com/guide"],
+      pages: [page(url: "https://example.com/guide", body: "<main><a href=\"/plans\">Plans</a></main>")],
+      issues: issues,
+      context: context(resolver: resolver)
+    )
+
+    redirect_issue = issues.to_a.find { |issue| issue.code == :internal_link_redirects }
+    assert redirect_issue
+    assert_includes redirect_issue.message, "https://example.com/pricing"
+  end
+
   def test_ignores_links_that_should_not_be_crawled
     issues = Crawlscope::IssueCollection.new
 

@@ -31,8 +31,13 @@ class CrawlscopeCrawlTest < Minitest::Test
           <html>
             <head>
               <title>Pricing</title>
-              <meta name="description" content="Plans for hotels and restaurants">
+              <meta name="description" content="Plans for hotels and restaurants that need practical software checks, clear metadata, and dependable search previews.">
               <link rel="canonical" href="https://example.com/pricing">
+              <meta property="og:title" content="Pricing">
+              <meta property="og:description" content="Plans for hotels and restaurants that need practical software checks, clear metadata, and dependable search previews.">
+              <meta property="og:url" content="https://example.com/pricing">
+              <meta property="og:type" content="website">
+              <meta property="og:image" content="https://example.com/icon.png">
               <script type="application/ld+json">
                 {"@context":"https://schema.org","@type":"WebSite","name":"Example","url":"https://example.com"}
               </script>
@@ -95,7 +100,7 @@ class CrawlscopeCrawlTest < Minitest::Test
     ).call
 
     refute result.ok?
-    assert_equal %i[meta_description_too_long missing_canonical missing_h1 missing_structured_data title_repeats_site_name].sort, result.issues.to_a.map(&:code).uniq.sort
+    assert_equal %i[incomplete_open_graph_tags meta_description_too_long missing_canonical missing_h1 missing_structured_data title_repeats_site_name].sort, result.issues.to_a.map(&:code).uniq.sort
   end
 
   def test_uses_browser_when_renderer_is_browser
@@ -128,8 +133,13 @@ class CrawlscopeCrawlTest < Minitest::Test
           <html>
             <head>
               <title>Pricing</title>
-              <meta name="description" content="Plans for hotels and restaurants">
+              <meta name="description" content="Plans for hotels and restaurants that need practical software checks, clear metadata, and dependable search previews.">
               <link rel="canonical" href="https://example.com/pricing">
+              <meta property="og:title" content="Pricing">
+              <meta property="og:description" content="Plans for hotels and restaurants that need practical software checks, clear metadata, and dependable search previews.">
+              <meta property="og:url" content="https://example.com/pricing">
+              <meta property="og:type" content="website">
+              <meta property="og:image" content="https://example.com/icon.png">
               <script type="application/ld+json">
                 {"@context":"https://schema.org","@type":"WebSite","name":"Example","url":"https://example.com"}
               </script>
