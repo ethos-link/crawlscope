@@ -268,7 +268,12 @@ bundle exec rake
 
 ### Git hooks
 
-We use [lefthook](https://lefthook.dev/) with the Ruby [commitlint](https://github.com/arandilopez/commitlint) gem to enforce Conventional Commits on every commit. We also use [Standard Ruby](https://standardrb.com/) to keep code style consistent. CI validates commit messages, Standard Ruby, tests, and git-cliff changelog generation on pull requests and pushes to main/master.
+We use [lefthook](https://lefthook.dev/) with the Ruby
+[commitlint](https://github.com/arandilopez/commitlint) gem to enforce
+Conventional Commits on every commit. We also use
+[Standard Ruby](https://standardrb.com/) to keep code style consistent. CI
+validates commit messages, Standard Ruby, tests, and git-cliff changelog
+generation on pull requests and pushes to main/master.
 
 Run the hook installer once per clone:
 
@@ -284,11 +289,16 @@ rake install
 
 ## Release
 
-Releases are tag-driven and published by GitHub Actions to RubyGems. Local release commands never publish directly.
+Releases are tag-driven and published by GitHub Actions to RubyGems.
+Local release commands never publish directly.
 
-Install [git-cliff](https://git-cliff.org/) locally before preparing a release. The release task regenerates `CHANGELOG.md` from Conventional Commits.
+Install [git-cliff](https://git-cliff.org/) locally before preparing a
+release. The release task prepends the next `CHANGELOG.md` section from
+Conventional Commits.
 
-Before preparing a release, make sure you are on `main` or `master` with a clean worktree.
+Before preparing a release, make sure you are on `main` or `master` with a
+clean worktree. If the release contains a breaking public-contract change,
+update `UPGRADE.md` with the host-app migration steps first.
 
 Then run one of:
 
@@ -301,12 +311,13 @@ bundle exec rake 'release:prepare[0.1.0]'
 
 The task will:
 
-1. Regenerate `CHANGELOG.md` with `git-cliff`.
+1. Prepend the next `CHANGELOG.md` section with `git-cliff`.
 1. Update `lib/crawlscope/version.rb`.
 1. Commit the release changes.
 1. Create and push the `vX.Y.Z` tag.
 
-The `Release` workflow then runs tests, publishes the gem to RubyGems, and creates the GitHub release from the changelog entry.
+The `Release` workflow then runs tests, publishes the gem to RubyGems,
+and creates the GitHub release from the changelog entry.
 
 ## Contributing
 
