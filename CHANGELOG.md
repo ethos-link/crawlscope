@@ -28,3 +28,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [0.2.0] - 2026-04-24
+
+
+### Changed
+
+- simplify crawl and structured data boundaries
+
+- harden validation boundaries
+
+
+
+
+### Fixed
+
+- handle child sitemaps
+
+- use URL for sitemap validation
+
+
+
+## [0.1.0] - 2026-04-23
+
+
+### Added
+
+- add crawlkit release-ready audit gem
+
+- add standalone validation commands
+
+- move default schema rules into crawlkit
+
+
+
+
+### Changed
+
+- strengthen public API coverage
+
+- load shared test dependencies
+
+- rename crawlkit to crawlscope
+
+
+
