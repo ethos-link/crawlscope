@@ -20,7 +20,14 @@ class CrawlscopeConfigurationTest < Minitest::Test
     assert_equal "https://example.com", audit.instance_variable_get(:@base_url)
     assert_equal "/tmp/sitemap.xml", audit.instance_variable_get(:@sitemap_path)
     assert_equal 4, audit.instance_variable_get(:@concurrency)
-    assert_equal %i[metadata structured_data uniqueness links], audit.instance_variable_get(:@rules).map(&:code)
+    assert_equal %i[
+      indexability
+      metadata
+      structured_data
+      uniqueness
+      content_quality
+      links
+    ], audit.instance_variable_get(:@rules).map(&:code)
   end
 
   def test_audit_raises_without_base_url

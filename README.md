@@ -23,9 +23,11 @@ It works in three modes:
 
 The default rule set includes:
 
+- indexability blockers
 - metadata validation
 - structured-data validation
 - uniqueness checks
+- content-quality checks
 - internal-link checks
 
 ## Installation
@@ -146,9 +148,11 @@ Available tasks:
 
 ```bash
 bin/rails crawlscope:validate
+bin/rails crawlscope:validate:indexability
 bin/rails crawlscope:validate:metadata
 bin/rails crawlscope:validate:structured_data
 bin/rails crawlscope:validate:uniqueness
+bin/rails crawlscope:validate:content_quality
 bin/rails crawlscope:validate:links
 bin/rails crawlscope:validate:ldjson
 ```
@@ -161,7 +165,7 @@ bundle exec rake crawlscope:validate:metadata URL=https://example.com
 bundle exec rake crawlscope:validate:ldjson URL=https://example.com/article
 ```
 
-`crawlscope:validate` runs all default sitemap rules: metadata, structured data, uniqueness, and links. `URL` is the site base. Without `SITEMAP`, Crawlscope uses `/sitemap.xml`. With `SITEMAP`, Crawlscope uses `URL` as the site base and validates URLs from that sitemap. `SITEMAP` may be a full URL or a local file path.
+`crawlscope:validate` runs all default sitemap rules: indexability, metadata, structured data, uniqueness, content quality, and links. `URL` is the site base. Without `SITEMAP`, Crawlscope uses `/sitemap.xml`. With `SITEMAP`, Crawlscope uses `URL` as the site base and validates URLs from that sitemap. `SITEMAP` may be a full URL or a local file path.
 
 `crawlscope:validate:ldjson` is separate because it directly checks the URL or semicolon-separated URLs in `URL`; it does not crawl the sitemap. Without `URL`, it checks the configured base URL, falling back to `http://localhost:3000`.
 
@@ -186,10 +190,19 @@ Optional flags:
 
 Built-in rules:
 
+- `indexability`
 - `metadata`
 - `structured_data`
 - `uniqueness`
+- `content_quality`
 - `links`
+
+### Indexability
+
+Checks:
+
+- page-level meta robots `noindex`
+- `X-Robots-Tag: noindex`
 
 ### Metadata
 
@@ -220,6 +233,15 @@ Checks:
 - duplicate titles
 - duplicate meta descriptions
 - duplicate content fingerprints
+- near-duplicate visible content
+
+### Content Quality
+
+Checks:
+
+- thin visible text
+- low visible-text-to-HTML ratio
+- low unique-token ratio
 
 ### Links
 

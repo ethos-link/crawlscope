@@ -12,12 +12,14 @@ module Crawlscope
     def self.default(site_name: nil)
       new(
         rules: [
+          Rules::Indexability.new,
           Rules::Metadata.new(site_name: site_name),
           Rules::StructuredData.new,
           Rules::Uniqueness.new,
+          Rules::ContentQuality.new,
           Rules::Links.new
         ],
-        default_codes: %i[metadata structured_data uniqueness links]
+        default_codes: %i[indexability metadata structured_data uniqueness content_quality links]
       )
     end
 
