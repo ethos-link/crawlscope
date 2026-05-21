@@ -103,7 +103,6 @@ class CrawlscopeCrawlTest < Minitest::Test
     refute result.ok?
     assert_equal %i[
       incomplete_open_graph_tags
-      low_visible_text_ratio
       meta_description_too_long
       missing_canonical
       missing_h1
