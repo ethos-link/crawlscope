@@ -45,6 +45,7 @@ class CrawlscopeCrawlTest < Minitest::Test
             <body>
               <main>
                 <h1>Pricing</h1>
+                <p>#{Array.new(260) { |index| "pricing#{index}" }.join(" ")}</p>
               </main>
             </body>
           </html>
@@ -100,7 +101,15 @@ class CrawlscopeCrawlTest < Minitest::Test
     ).call
 
     refute result.ok?
-    assert_equal %i[incomplete_open_graph_tags meta_description_too_long missing_canonical missing_h1 missing_structured_data title_repeats_site_name].sort, result.issues.to_a.map(&:code).uniq.sort
+    assert_equal %i[
+      incomplete_open_graph_tags
+      meta_description_too_long
+      missing_canonical
+      missing_h1
+      missing_structured_data
+      thin_visible_text
+      title_repeats_site_name
+    ].sort, result.issues.to_a.map(&:code).uniq.sort
   end
 
   def test_uses_browser_when_renderer_is_browser
@@ -147,6 +156,7 @@ class CrawlscopeCrawlTest < Minitest::Test
             <body>
               <main>
                 <h1>Pricing</h1>
+                <p>#{Array.new(260) { |index| "pricing#{index}" }.join(" ")}</p>
               </main>
             </body>
           </html>

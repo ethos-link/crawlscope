@@ -10,6 +10,11 @@ namespace :crawlscope do
       Crawlscope::RakeTasks.ldjson
     end
 
+    desc "Validate URLs with the indexability rule. ENV: URL, SITEMAP, JS=1"
+    task indexability: :environment do
+      Crawlscope::RakeTasks.validate_rule("indexability")
+    end
+
     desc "Validate URLs with the metadata rule. ENV: URL, SITEMAP, JS=1"
     task metadata: :environment do
       Crawlscope::RakeTasks.validate_rule("metadata")
@@ -23,6 +28,11 @@ namespace :crawlscope do
     desc "Validate URLs with the uniqueness rule. ENV: URL, SITEMAP, JS=1"
     task uniqueness: :environment do
       Crawlscope::RakeTasks.validate_rule("uniqueness")
+    end
+
+    desc "Validate URLs with the content_quality rule. ENV: URL, SITEMAP, JS=1"
+    task content_quality: :environment do
+      Crawlscope::RakeTasks.validate_rule("content_quality")
     end
 
     desc "Validate URLs with the links rule. ENV: URL, SITEMAP, JS=1"
