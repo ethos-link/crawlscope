@@ -34,9 +34,47 @@ class CrawlscopeIndexabilityRuleTest < Minitest::Test
     assert_equal "noindex", issue.details[:content]
   end
 
+  def test_reports_x_robots_tag_noindex_for_non_html_response
+    issues = Crawlscope::IssueCollection.new
+    page = page_with(
+      body: "%PDF-1.7",
+      doc: nil,
+      headers: {"content-type" => "application/pdf", "X-Robots-Tag" => "noindex"}
+    )
+
+    Crawlscope::Rules::Indexability.new.call(urls: [page.url], pages: [page], issues: issues)
+
+    issue = issues.to_a.fetch(0)
+    assert_equal :noindex_header, issue.code
+    assert_equal :error, issue.severity
+    assert_equal "noindex", issue.details[:content]
+  end
+
+  def test_reports_scoped_x_robots_tag_noindex
+    issues = Crawlscope::IssueCollection.new
+    page = page_with(headers: {"X-Robots-Tag" => "googlebot: noindex, nofollow"})
+
+    Crawlscope::Rules::Indexability.new.call(urls: [page.url], pages: [page], issues: issues)
+
+    issue = issues.to_a.fetch(0)
+    assert_equal :noindex_header, issue.code
+    assert_equal "googlebot: noindex, nofollow", issue.details[:content]
+  end
+
+  def test_reports_x_robots_tag_none
+    issues = Crawlscope::IssueCollection.new
+    page = page_with(headers: {"X-Robots-Tag" => "none"})
+
+    Crawlscope::Rules::Indexability.new.call(urls: [page.url], pages: [page], issues: issues)
+
+    issue = issues.to_a.fetch(0)
+    assert_equal :noindex_header, issue.code
+    assert_equal "none", issue.details[:content]
+  end
+
   private
 
-  def page_with(body: nil, headers: {"content-type" => "text/html"})
+  def page_with(body: nil, doc: :parse, headers: {"content-type" => "text/html"})
     body ||= <<~HTML
       <html>
         <head><title>Indexable</title></head>
@@ -52,7 +90,7 @@ class CrawlscopeIndexabilityRuleTest < Minitest::Test
       status: 200,
       headers: headers,
       body: body,
-      doc: Nokogiri::HTML(body)
+      doc: (doc == :parse) ? Nokogiri::HTML(body) : doc
     )
   end
 end

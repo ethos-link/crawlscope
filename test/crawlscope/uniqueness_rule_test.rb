@@ -31,6 +31,22 @@ class CrawlscopeUniquenessRuleTest < Minitest::Test
     assert_operator issue.details[:similarity], :>=, issue.details[:threshold]
   end
 
+  def test_skips_near_duplicate_scan_when_page_count_exceeds_limit
+    issues = Crawlscope::IssueCollection.new
+    rule = Crawlscope::Rules::Uniqueness.new(max_near_duplicate_pages: 1)
+    pages = [
+      page(url: "https://example.com/a", content: near_duplicate_content("reliable")),
+      page(url: "https://example.com/b", content: near_duplicate_content("dependable"))
+    ]
+
+    rule.call(urls: pages.map(&:url), pages: pages, issues: issues, context: {})
+
+    skip_issue = issues.to_a.find { |item| item.code == :near_duplicate_scan_skipped }
+    refute issues.to_a.any? { |item| item.code == :near_duplicate_content }
+    assert_equal :warning, skip_issue.severity
+    assert_equal({max_pages: 1, page_count: 2}, skip_issue.details)
+  end
+
   private
 
   def near_duplicate_content(adjective)

@@ -14,9 +14,7 @@ module Crawlscope
 
       def call(urls:, pages:, issues:, context: nil)
         pages.each do |page|
-          next unless page.html?
-
-          validate_meta_robots(page, issues)
+          validate_meta_robots(page, issues) if page.html?
           validate_x_robots_tag(page, issues)
         end
       end
@@ -28,7 +26,10 @@ module Crawlscope
       end
 
       def noindex?(value)
-        value.split(",").map(&:strip).any? { |directive| directive.casecmp?("noindex") }
+        value
+          .split(",")
+          .map { |directive| directive.split(":", 2).last.to_s.strip }
+          .any? { |directive| directive.casecmp?("noindex") || directive.casecmp?("none") }
       end
 
       def validate_meta_robots(page, issues)

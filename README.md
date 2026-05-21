@@ -233,7 +233,11 @@ Checks:
 - duplicate titles
 - duplicate meta descriptions
 - duplicate content fingerprints
-- near-duplicate visible content
+- near-duplicate visible content for up to 250 HTML pages
+
+For larger crawls, exact duplicate checks still run and Crawlscope reports
+`near_duplicate_scan_skipped`. Configure `Rules::Uniqueness` with
+`max_near_duplicate_pages:` in a custom rule registry to change the limit.
 
 ### Content Quality
 

@@ -6,6 +6,7 @@ module Crawlscope
   module Rules
     class Uniqueness
       MINIMUM_SHINGLES = 10
+      MAX_NEAR_DUPLICATE_PAGES = 250
       NEAR_DUPLICATE_THRESHOLD = 0.9
       SHINGLE_SIZE = 5
 
@@ -13,10 +14,12 @@ module Crawlscope
 
       def initialize(
         near_duplicate_threshold: NEAR_DUPLICATE_THRESHOLD,
+        max_near_duplicate_pages: MAX_NEAR_DUPLICATE_PAGES,
         minimum_shingles: MINIMUM_SHINGLES,
         shingle_size: SHINGLE_SIZE
       )
         @code = :uniqueness
+        @max_near_duplicate_pages = max_near_duplicate_pages
         @minimum_shingles = minimum_shingles
         @near_duplicate_threshold = near_duplicate_threshold
         @shingle_size = shingle_size
@@ -104,6 +107,18 @@ module Crawlscope
       end
 
       def validate_near_duplicates(page_summaries, issues)
+        if near_duplicate_scan_limit_exceeded?(page_summaries)
+          issues.add(
+            code: :near_duplicate_scan_skipped,
+            severity: :warning,
+            category: :uniqueness,
+            url: nil,
+            message: "near duplicate scan skipped for #{page_summaries.size} pages",
+            details: {max_pages: @max_near_duplicate_pages, page_count: page_summaries.size}
+          )
+          return
+        end
+
         page_summaries.combination(2) do |left, right|
           next if same_content_fingerprint?(left, right)
           next if left[:shingles].size < @minimum_shingles || right[:shingles].size < @minimum_shingles
@@ -122,6 +137,10 @@ module Crawlscope
             details: {similarity: similarity.round(3), threshold: @near_duplicate_threshold, urls: urls}
           )
         end
+      end
+
+      def near_duplicate_scan_limit_exceeded?(page_summaries)
+        !@max_near_duplicate_pages.nil? && page_summaries.size > @max_near_duplicate_pages
       end
 
       def same_content_fingerprint?(left, right)
