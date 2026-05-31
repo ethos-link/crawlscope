@@ -13,7 +13,20 @@ class CrawlscopeUniquenessRuleTest < Minitest::Test
 
     rule.call(urls: pages.map(&:url), pages: pages, issues: issues, context: {})
 
-    assert_equal %i[duplicate_content_fingerprint duplicate_meta_description duplicate_title].sort, issues.to_a.map(&:code).sort
+    assert_equal %i[duplicate_content_fingerprint duplicate_meta_description duplicate_pages_without_canonical duplicate_title].sort, issues.to_a.map(&:code).sort
+  end
+
+  def test_allows_duplicate_pages_when_canonicals_are_present
+    issues = Crawlscope::IssueCollection.new
+    rule = Crawlscope::Rules::Uniqueness.new
+    pages = [
+      page(url: "https://example.com/a", canonical: "https://example.com/a"),
+      page(url: "https://example.com/b", canonical: "https://example.com/a")
+    ]
+
+    rule.call(urls: pages.map(&:url), pages: pages, issues: issues, context: {})
+
+    refute_includes issues.to_a.map(&:code), :duplicate_pages_without_canonical
   end
 
   def test_reports_near_duplicate_content
@@ -59,13 +72,15 @@ class CrawlscopeUniquenessRuleTest < Minitest::Test
     TEXT
   end
 
-  def page(url:, content: nil)
+  def page(url:, content: nil, canonical: nil)
     repeated_text = content || ("Useful content " * 30).strip
+    canonical_tag = canonical ? %(<link rel="canonical" href="#{canonical}">) : ""
     body = <<~HTML
       <html>
         <head>
           <title>Example Title</title>
           <meta name="description" content="Example description">
+          #{canonical_tag}
         </head>
         <body>
           <main>#{repeated_text}</main>

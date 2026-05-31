@@ -37,10 +37,13 @@ module Crawlscope
         @err.puts(general_usage)
         1
       end
-    rescue OptionParser::InvalidOption, OptionParser::MissingArgument, ConfigurationError, ValidationError, ArgumentError => error
+    rescue OptionParser::InvalidOption, OptionParser::MissingArgument, ConfigurationError, ArgumentError => error
       @err.puts(error.message)
       @err.puts("")
       @err.puts(general_usage)
+      1
+    rescue ValidationError => error
+      @err.puts(error.message)
       1
     end
 

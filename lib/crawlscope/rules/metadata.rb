@@ -18,22 +18,41 @@ module Crawlscope
       end
 
       def call(urls:, pages:, issues:, context: nil)
+        sitemap_urls = normalized_sitemap_urls(urls)
+
         pages.each do |page|
           next unless page.html?
 
           validate_h1(page, issues)
           validate_title(page, issues)
           validate_description(page, issues)
-          validate_canonical(page, issues)
+          validate_canonical(page, issues, sitemap_urls)
           validate_open_graph(page, issues)
         end
       end
 
       private
 
+      def normalized_sitemap_urls(urls)
+        urls.map { |url| Url.normalize(url, base_url: url) }.compact
+      end
+
       def validate_h1(page, issues)
         h1s = page.doc.css("h1")
-        return if h1s.one?
+        empty_h1s = h1s.select { |node| node.text.to_s.strip.empty? }
+
+        if empty_h1s.any?
+          issues.add(
+            code: :empty_h1,
+            severity: :warning,
+            category: :metadata,
+            url: page.url,
+            message: "empty <h1>",
+            details: {count: empty_h1s.size}
+          )
+        end
+
+        return if h1s.one? && empty_h1s.empty?
 
         if h1s.empty?
           issues.add(
@@ -57,7 +76,19 @@ module Crawlscope
       end
 
       def validate_title(page, issues)
-        title = page.doc.at_css("title")&.text.to_s.strip
+        titles = page.doc.css("head > title")
+        title = titles.first&.text.to_s.strip
+
+        if titles.size > 1
+          issues.add(
+            code: :multiple_title_tags,
+            severity: :warning,
+            category: :metadata,
+            url: page.url,
+            message: "multiple <title> tags (#{titles.size})",
+            details: {count: titles.size}
+          )
+        end
 
         if title.empty?
           issues.add(code: :missing_title, severity: :warning, category: :metadata, url: page.url, message: "missing <title>", details: {})
@@ -69,7 +100,19 @@ module Crawlscope
       end
 
       def validate_description(page, issues)
-        description = page.doc.at_css('meta[name="description"]')&.[]("content").to_s.strip
+        descriptions = page.doc.css('head > meta[name="description"]')
+        description = descriptions.first&.[]("content").to_s.strip
+
+        if descriptions.size > 1
+          issues.add(
+            code: :multiple_meta_descriptions,
+            severity: :warning,
+            category: :metadata,
+            url: page.url,
+            message: "multiple meta description tags (#{descriptions.size})",
+            details: {count: descriptions.size}
+          )
+        end
 
         if description.empty?
           issues.add(code: :missing_meta_description, severity: :warning, category: :metadata, url: page.url, message: "missing meta description", details: {})
@@ -80,7 +123,7 @@ module Crawlscope
         end
       end
 
-      def validate_canonical(page, issues)
+      def validate_canonical(page, issues, sitemap_urls)
         canonical = page.doc.at_css('link[rel="canonical"]')&.[]("href").to_s.strip
 
         if canonical.empty?
@@ -92,13 +135,25 @@ module Crawlscope
         normalized_page_url = Url.normalize(page.url, base_url: page.url)
         return if canonical_matches_page?(normalized_canonical, normalized_page_url)
 
+        details = {canonical: canonical}
         issues.add(
           code: :canonical_mismatch,
           severity: :warning,
           category: :metadata,
           url: page.url,
           message: "canonical mismatch (#{canonical})",
-          details: {canonical: canonical}
+          details: details
+        )
+
+        return unless sitemap_urls.include?(normalized_page_url)
+
+        issues.add(
+          code: :non_canonical_page_in_sitemap,
+          severity: :warning,
+          category: :sitemaps,
+          url: page.url,
+          message: "non-canonical page is included in sitemap",
+          details: details
         )
       end
 

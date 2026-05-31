@@ -20,6 +20,39 @@ class CrawlscopeIndexabilityRuleTest < Minitest::Test
     assert_equal :noindex_meta, issue.code
     assert_equal :error, issue.severity
     assert_equal "noindex, follow", issue.details[:content]
+
+    codes = issues.to_a.map(&:code)
+    assert_includes codes, :noindex_follow_meta
+    assert_includes codes, :sitemap_noindex_url
+  end
+
+  def test_reports_meta_nofollow
+    issues = Crawlscope::IssueCollection.new
+    page = page_with(
+      body: <<~HTML
+        <html>
+          <head><meta name="robots" content="nofollow"></head>
+          <body><main>Visible content</main></body>
+        </html>
+      HTML
+    )
+
+    Crawlscope::Rules::Indexability.new.call(urls: [page.url], pages: [page], issues: issues)
+
+    assert_equal [:nofollow_meta], issues.to_a.map(&:code)
+  end
+
+  def test_reports_noindex_nofollow_header
+    issues = Crawlscope::IssueCollection.new
+    page = page_with(headers: {"X-Robots-Tag" => "googlebot: noindex, nofollow"})
+
+    Crawlscope::Rules::Indexability.new.call(urls: [page.url], pages: [page], issues: issues)
+
+    codes = issues.to_a.map(&:code)
+    assert_includes codes, :noindex_header
+    assert_includes codes, :nofollow_header
+    assert_includes codes, :noindex_nofollow_header
+    assert_includes codes, :sitemap_noindex_url
   end
 
   def test_reports_x_robots_tag_noindex

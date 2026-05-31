@@ -265,6 +265,7 @@ class CrawlscopeCliTest < Minitest::Test
 
     assert_equal 1, status
     assert_includes err.string, "No URLs found in sitemap"
+    refute_includes err.string, "Usage:"
   end
 
   private

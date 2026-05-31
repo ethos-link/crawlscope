@@ -55,6 +55,8 @@ module Crawlscope
             next
           end
 
+          validate_type_presence(page, source, data, issues)
+
           errors = schema_registry.validate(data)
           next if errors.empty?
 
@@ -94,6 +96,35 @@ module Crawlscope
             details: {expected_type: "JobPosting"}
           )
         end
+      end
+
+      def validate_type_presence(page, source, data, issues)
+        missing_paths = missing_type_paths(data)
+        return if missing_paths.empty?
+
+        issues.add(
+          code: :structured_data_missing_type,
+          severity: :warning,
+          category: :structured_data,
+          url: page.url,
+          message: "#{source} structured data missing @type",
+          details: {paths: missing_paths, source: source}
+        )
+      end
+
+      def missing_type_paths(data, path = "$")
+        return [] unless data.is_a?(Hash)
+
+        paths = []
+        paths << path if data["@type"].to_s.strip.empty?
+
+        if data["@graph"].is_a?(Array)
+          data["@graph"].each_with_index do |entry, index|
+            paths.concat(missing_type_paths(entry, "#{path}.@graph[#{index}]"))
+          end
+        end
+
+        paths
       end
 
       def structured_data_types(data)

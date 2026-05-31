@@ -25,6 +25,9 @@ module Crawlscope
       visited.add(source)
       document = Nokogiri::XML(read(source))
       root_name = document.root&.name
+      unless %w[sitemapindex urlset].include?(root_name)
+        raise ValidationError, "Sitemap #{source} has unexpected root #{root_name.inspect}"
+      end
 
       if root_name == "sitemapindex"
         document.xpath("//xmlns:sitemap/xmlns:loc", SITEMAP_NAMESPACE).flat_map do |node|
@@ -40,7 +43,12 @@ module Crawlscope
 
     def read(source)
       if Url.remote?(source)
-        connection.get(source).body
+        response = connection.get(source)
+        unless response.status.to_i.between?(200, 299)
+          raise ValidationError, "Sitemap #{source} returned HTTP #{response.status}"
+        end
+
+        response.body
       else
         File.read(source)
       end
