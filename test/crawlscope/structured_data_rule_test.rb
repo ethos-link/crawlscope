@@ -79,6 +79,62 @@ class CrawlscopeStructuredDataRuleTest < Minitest::Test
     assert_equal ["json-ld", "microdata"], issues.to_a.first.details[:expected_sources]
   end
 
+  def test_reports_structured_data_missing_type
+    issues = Crawlscope::IssueCollection.new
+    rule = Crawlscope::Rules::StructuredData.new
+    page = page(
+      url: "https://example.com/articles/test",
+      body: <<~HTML
+        <html>
+          <head>
+            <script type="application/ld+json">
+              {"@context":"https://schema.org","headline":"Untyped article"}
+            </script>
+          </head>
+          <body><h1>Article</h1></body>
+        </html>
+      HTML
+    )
+
+    rule.call(
+      urls: [page.url],
+      pages: [page],
+      issues: issues,
+      context: {schema_registry: Crawlscope::SchemaRegistry.default}
+    )
+
+    assert_includes issues.to_a.map(&:code), :structured_data_missing_type
+  end
+
+  def test_reports_graph_entries_missing_type
+    issues = Crawlscope::IssueCollection.new
+    rule = Crawlscope::Rules::StructuredData.new
+    page = page(
+      url: "https://example.com/articles/test",
+      body: <<~HTML
+        <html>
+          <head>
+            <script type="application/ld+json">
+              {"@context":"https://schema.org","@type":"WebPage","@graph":[{"name":"Untyped node"}]}
+            </script>
+          </head>
+          <body><h1>Article</h1></body>
+        </html>
+      HTML
+    )
+
+    rule.call(
+      urls: [page.url],
+      pages: [page],
+      issues: issues,
+      context: {schema_registry: Crawlscope::SchemaRegistry.default}
+    )
+
+    issue = issues.to_a.find { |item| item.code == :structured_data_missing_type }
+    assert issue
+    assert_equal ["$.@graph[0]"], issue.details[:paths]
+  end
+
   def test_validates_job_posting_markup
     issues = Crawlscope::IssueCollection.new
     rule = Crawlscope::Rules::StructuredData.new

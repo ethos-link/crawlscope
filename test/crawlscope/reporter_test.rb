@@ -23,7 +23,7 @@ class CrawlscopeReporterTest < Minitest::Test
     refute_includes output, "Status: FAILED"
   end
 
-  def test_reports_failed_result_with_severity_counts
+  def test_reports_failed_result_with_grouped_counts_and_offenses
     io = StringIO.new
     issues = Crawlscope::IssueCollection.new
     issues.add(code: :missing_title, severity: :warning, category: :metadata, url: "https://example.com/a", message: "missing <title>", details: {})
@@ -42,9 +42,13 @@ class CrawlscopeReporterTest < Minitest::Test
 
     assert_includes output, "Status: FAILED"
     assert_includes output, "Issues: 2"
+    assert_includes output, "Severity:"
     assert_includes output, "notice: 1"
     assert_includes output, "warning: 1"
-    assert_includes output, "- [warning] https://example.com/a missing <title>"
-    assert_includes output, "- [notice] https://example.com/b broken internal link"
+    assert_includes output, "Category:"
+    assert_includes output, "links: 1"
+    assert_includes output, "metadata: 1"
+    assert_includes output, "  - [warning] missing_title https://example.com/a missing <title>"
+    assert_includes output, "  - [notice] broken_internal_link https://example.com/b broken internal link"
   end
 end

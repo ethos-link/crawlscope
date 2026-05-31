@@ -49,6 +49,30 @@ class CrawlscopeSitemapTest < Minitest::Test
     assert_equal ["https://www.example.com/features/reviews"], parser.urls(base_url: "https://www.example.com")
   end
 
+  def test_remote_sitemap_http_error_is_explicit
+    stub_request(:get, "https://www.example.com/sitemap.xml")
+      .to_return(status: 500, body: "<html><body>Error</body></html>")
+
+    parser = Crawlscope::Sitemap.new(path: "https://www.example.com/sitemap.xml")
+
+    error = assert_raises(Crawlscope::ValidationError) do
+      parser.urls(base_url: "https://www.example.com")
+    end
+    assert_equal "Sitemap https://www.example.com/sitemap.xml returned HTTP 500", error.message
+  end
+
+  def test_invalid_sitemap_root_is_explicit
+    stub_request(:get, "https://www.example.com/sitemap.xml")
+      .to_return(status: 200, body: "<html><body>Error</body></html>")
+
+    parser = Crawlscope::Sitemap.new(path: "https://www.example.com/sitemap.xml")
+
+    error = assert_raises(Crawlscope::ValidationError) do
+      parser.urls(base_url: "https://www.example.com")
+    end
+    assert_equal 'Sitemap https://www.example.com/sitemap.xml has unexpected root "html"', error.message
+  end
+
   def test_rebases_remote_sitemap_index_children_to_base_url
     stub_request(:get, "http://localhost:3000/sitemap.xml")
       .to_return(

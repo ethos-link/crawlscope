@@ -188,4 +188,30 @@ class CrawlscopeCrawlTest < Minitest::Test
     assert_equal ["https://example.com/pricing"], fake_browser.urls
     assert fake_browser.closed
   end
+
+  def test_reports_sitemap_redirect_url
+    File.write(
+      @sitemap_path,
+      <<~XML
+        <?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url><loc>https://example.com/old</loc></url>
+        </urlset>
+      XML
+    )
+
+    stub_request(:get, "https://example.com/old")
+      .to_return(status: 301, headers: {"Location" => "https://example.com/new"}, body: "")
+    stub_request(:get, "https://example.com/new")
+      .to_return(status: 200, headers: {"Content-Type" => "text/html"}, body: "<html><body>Moved</body></html>")
+
+    result = Crawlscope::Crawl.new(
+      base_url: "https://example.com",
+      sitemap_path: @sitemap_path,
+      rules: [],
+      schema_registry: Crawlscope::SchemaRegistry.default
+    ).call
+
+    assert_includes result.issues.to_a.map(&:code), :sitemap_redirect_url
+  end
 end

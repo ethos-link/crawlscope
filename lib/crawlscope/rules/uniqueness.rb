@@ -58,6 +58,7 @@ module Crawlscope
 
         {
           content_fingerprint_digest: content_fingerprint_digest(page.doc),
+          canonical: page.doc.at_css('link[rel="canonical"]')&.[]("href").to_s.strip,
           description: page.doc.at_css('meta[name="description"]')&.[]("content").to_s.strip,
           shingles: shingles_for(tokens),
           title: page.doc.at_css("title")&.text.to_s.strip,
@@ -98,6 +99,27 @@ module Crawlscope
             details: {urls: urls}
           )
         end
+
+        duplicate_content_clusters_without_canonical(page_summaries).each do |urls|
+          issues.add(
+            code: :duplicate_pages_without_canonical,
+            severity: :warning,
+            category: :uniqueness,
+            url: nil,
+            message: "duplicate pages without canonical => #{urls.join(", ")}",
+            details: {urls: urls}
+          )
+        end
+      end
+
+      def duplicate_content_clusters_without_canonical(page_summaries)
+        page_summaries
+          .select { |page| !page[:content_fingerprint_digest].nil? }
+          .group_by { |page| page[:content_fingerprint_digest] }
+          .values
+          .select { |pages| pages.size > 1 }
+          .select { |pages| pages.any? { |page| page[:canonical].to_s.empty? } }
+          .map { |pages| pages.map { |page| page[:url] } }
       end
 
       def shingles_for(tokens)

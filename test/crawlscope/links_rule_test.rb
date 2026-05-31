@@ -41,7 +41,7 @@ class CrawlscopeLinksRuleTest < Minitest::Test
       context: context
     )
 
-    assert_equal [:broken_internal_link], issues.to_a.map(&:code)
+    assert_includes issues.to_a.map(&:code), :broken_internal_link
     assert_includes issues.to_a.first.message, "HTTP 404"
   end
 
@@ -114,8 +114,151 @@ class CrawlscopeLinksRuleTest < Minitest::Test
       context: context
     )
 
-    assert_equal [:low_inbound_anchor_links], issues.to_a.map(&:code)
-    assert_equal "https://example.com/guide", issues.to_a.first.url
+    orphan_issue = issues.to_a.find { |item| item.code == :orphan_page }
+    assert orphan_issue
+    assert_includes issues.to_a.map(&:code), :low_dofollow_inlinks
+    assert_equal "https://example.com/guide", orphan_issue.url
+  end
+
+  def test_reports_pages_with_no_outgoing_internal_links
+    issues = Crawlscope::IssueCollection.new
+
+    Crawlscope::Rules::Links.new.call(
+      urls: ["https://example.com/guide", "https://example.com/pricing"],
+      pages: [
+        page(url: "https://example.com/guide", body: "<main><a href=\"/pricing\">Pricing</a></main>"),
+        page(url: "https://example.com/pricing", body: "<main><p>Pricing</p></main>")
+      ],
+      issues: issues,
+      context: context
+    )
+
+    issue = issues.to_a.find { |item| item.code == :page_has_no_outgoing_links }
+    assert issue
+    assert_equal "https://example.com/pricing", issue.url
+  end
+
+  def test_reports_nofollow_outlinks_and_inlink_follow_mix
+    issues = Crawlscope::IssueCollection.new
+
+    Crawlscope::Rules::Links.new.call(
+      urls: ["https://example.com/guide", "https://example.com/pricing", "https://example.com/about"],
+      pages: [
+        page(url: "https://example.com/guide", body: "<main><a href=\"/pricing\" rel=\"nofollow\">Pricing</a><a href=\"/about\">About</a></main>"),
+        page(url: "https://example.com/about", body: "<main><a href=\"/pricing\">Pricing</a></main>"),
+        page(url: "https://example.com/pricing", body: "<main><p>Pricing</p></main>")
+      ],
+      issues: issues,
+      context: context(resolver: ->(target_url) { {crawled: true, error: nil, final_url: target_url, status: 200} })
+    )
+
+    codes = issues.to_a.map(&:code)
+    assert_includes codes, :nofollow_internal_outlinks
+    assert_includes codes, :mixed_follow_internal_inlinks
+  end
+
+  def test_reports_only_nofollow_internal_inlinks
+    issues = Crawlscope::IssueCollection.new
+
+    Crawlscope::Rules::Links.new.call(
+      urls: ["https://example.com/guide", "https://example.com/pricing"],
+      pages: [
+        page(url: "https://example.com/guide", body: "<main><a href=\"/pricing\" rel=\"nofollow\">Pricing</a></main>"),
+        page(url: "https://example.com/pricing", body: "<main><p>Pricing</p></main>")
+      ],
+      issues: issues,
+      context: context(resolver: ->(target_url) { {crawled: true, error: nil, final_url: target_url, status: 200} })
+    )
+
+    assert_includes issues.to_a.map(&:code), :only_nofollow_internal_inlinks
+  end
+
+  def test_reports_https_pages_linking_to_internal_http_urls
+    issues = Crawlscope::IssueCollection.new
+
+    Crawlscope::Rules::Links.new.call(
+      urls: ["https://example.com/guide"],
+      pages: [page(url: "https://example.com/guide", body: "<main><a href=\"http://example.com/pricing\">Pricing</a></main>")],
+      issues: issues,
+      context: context(resolver: ->(target_url) { {crawled: true, error: nil, final_url: target_url, status: 200} })
+    )
+
+    assert_includes issues.to_a.map(&:code), :http_internal_link
+  end
+
+  def test_reports_canonical_target_link_issues
+    issues = Crawlscope::IssueCollection.new
+    resolver = lambda do |target_url|
+      redirects = target_url == "https://example.com/canonical-about"
+      status = redirects ? 301 : 200
+      final_url = redirects ? "https://example.com/about" : target_url
+      {crawled: false, error: nil, final_url: final_url, status: status}
+    end
+
+    Crawlscope::Rules::Links.new.call(
+      urls: ["https://example.com/guide", "https://example.com/about"],
+      pages: [
+        page(url: "https://example.com/guide", body: "<main><a href=\"/about\">About</a></main>"),
+        page(
+          url: "https://example.com/about",
+          body: <<~HTML
+            <html>
+              <head><link rel="canonical" href="https://example.com/canonical-about"></head>
+              <body><main><p>About</p></main></body>
+            </html>
+          HTML
+        )
+      ],
+      issues: issues,
+      context: context(resolver: resolver)
+    )
+
+    codes = issues.to_a.map(&:code)
+    assert_includes codes, :canonical_no_internal_inlinks
+    assert_includes codes, :canonical_points_to_redirect
+  end
+
+  def test_reports_indexable_internal_pages_missing_from_sitemap
+    issues = Crawlscope::IssueCollection.new
+    resolver = lambda do |target_url|
+      {
+        crawled: false,
+        error: nil,
+        final_url: target_url,
+        html: true,
+        status: 200
+      }
+    end
+
+    Crawlscope::Rules::Links.new.call(
+      urls: ["https://example.com/guide"],
+      pages: [page(url: "https://example.com/guide", body: "<main><a href=\"/hidden\">Hidden</a></main>")],
+      issues: issues,
+      context: context(resolver: resolver)
+    )
+
+    issue = issues.to_a.find { |item| item.code == :indexable_page_missing_from_sitemap }
+    assert issue
+    assert_equal "https://example.com/hidden", issue.url
+  end
+
+  def test_reports_url_hygiene_issues
+    issues = Crawlscope::IssueCollection.new
+    long_path = "a" * 2_050
+
+    Crawlscope::Rules::Links.new.call(
+      urls: ["https://example.com//bad", "https://example.com/#{long_path}"],
+      pages: [
+        page(url: "https://example.com//bad", body: "<main><a href=\"/ok\">OK</a></main>"),
+        page(url: "https://example.com/#{long_path}", body: "<main><a href=\"/ok\">OK</a></main>")
+      ],
+      issues: issues,
+      context: context(resolver: ->(target_url) { {crawled: false, error: nil, final_url: target_url, html: true, status: 200} })
+    )
+
+    codes = issues.to_a.map(&:code)
+    assert_includes codes, :url_double_slash
+    assert_includes codes, :url_too_long
   end
 
   def test_counts_root_page_links_as_inbound_links
@@ -217,6 +360,7 @@ class CrawlscopeLinksRuleTest < Minitest::Test
         crawled: true,
         error: nil,
         final_url: target_url,
+        html: true,
         status: 200
       }
     when "https://example.com/missing"
@@ -224,6 +368,7 @@ class CrawlscopeLinksRuleTest < Minitest::Test
         crawled: false,
         error: nil,
         final_url: target_url,
+        html: false,
         status: 404
       }
     end

@@ -48,6 +48,42 @@ class CrawlscopeMetadataRuleTest < Minitest::Test
     refute_includes issues.to_a.map(&:code), :canonical_mismatch
   end
 
+  def test_reports_multiple_title_multiple_descriptions_empty_h1_and_sitemap_canonical_mismatch
+    issues = Crawlscope::IssueCollection.new
+    invalid_page = page(
+      body: <<~HTML
+        <html>
+          <head>
+            <title>About</title>
+            <title>Duplicate About</title>
+            <meta name="description" content="A clear description that is long enough for search snippets, local validation checks, and realistic production metadata audits.">
+            <meta name="description" content="Duplicate description">
+            <link rel="canonical" href="https://example.com/canonical-about">
+            <meta property="og:title" content="About">
+            <meta property="og:description" content="About page">
+            <meta property="og:url" content="https://example.com/about">
+            <meta property="og:type" content="website">
+            <meta property="og:image" content="https://example.com/icon.png">
+          </head>
+          <body><main><h1> </h1></main></body>
+        </html>
+      HTML
+    )
+
+    Crawlscope::Rules::Metadata.new.call(
+      urls: [invalid_page.url],
+      pages: [invalid_page],
+      issues: issues
+    )
+
+    codes = issues.to_a.map(&:code)
+    assert_includes codes, :multiple_title_tags
+    assert_includes codes, :multiple_meta_descriptions
+    assert_includes codes, :empty_h1
+    assert_includes codes, :canonical_mismatch
+    assert_includes codes, :non_canonical_page_in_sitemap
+  end
+
   private
 
   def page(url: "https://example.com/about", body: nil)

@@ -161,11 +161,17 @@ The same validation surface is also available in the gem repository itself throu
 
 ```bash
 bundle exec rake crawlscope:validate URL=https://example.com
+bundle exec rake 'crawlscope:validate[https://example.com]'
 bundle exec rake crawlscope:validate:metadata URL=https://example.com
+bundle exec rake 'crawlscope:validate:metadata[https://example.com]'
 bundle exec rake crawlscope:validate:ldjson URL=https://example.com/article
+bundle exec rake 'crawlscope:validate:ldjson[https://example.com/article]'
 ```
 
 `crawlscope:validate` runs all default sitemap rules: indexability, metadata, structured data, uniqueness, content quality, and links. `URL` is the site base. Without `SITEMAP`, Crawlscope uses `/sitemap.xml`. With `SITEMAP`, Crawlscope uses `URL` as the site base and validates URLs from that sitemap. `SITEMAP` may be a full URL or a local file path.
+
+Plain `rake` does not pass `--url` style flags to tasks. Use `URL=...` or the
+task-argument form above instead.
 
 `crawlscope:validate:ldjson` is separate because it directly checks the URL or semicolon-separated URLs in `URL`; it does not crawl the sitemap. Without `URL`, it checks the configured base URL, falling back to `http://localhost:3000`.
 
