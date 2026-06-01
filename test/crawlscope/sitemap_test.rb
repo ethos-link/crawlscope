@@ -3,6 +3,19 @@
 require "test_helper"
 
 class CrawlscopeSitemapTest < Minitest::Test
+  class RecordingExecutor
+    attr_reader :batches
+
+    def initialize
+      @batches = []
+    end
+
+    def call(items)
+      @batches << items
+      items.map { |item| yield(item) }
+    end
+  end
+
   def test_parses_remote_sitemap_urlset
     stub_request(:get, "https://www.example.com/sitemap.xml")
       .to_return(
@@ -125,6 +138,45 @@ class CrawlscopeSitemapTest < Minitest::Test
       parser = Crawlscope::Sitemap.new(path: File.join(dir, "sitemap.xml"))
 
       assert_equal ["http://localhost:3000/features/reviews"], parser.urls(base_url: "http://localhost:3000")
+    end
+  end
+
+  def test_child_sitemaps_are_collected_through_the_fetch_executor
+    Dir.mktmpdir do |dir|
+      File.write(
+        File.join(dir, "sitemap.xml"),
+        <<~XML
+          <?xml version="1.0" encoding="UTF-8"?>
+          <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+            <sitemap><loc>first.xml</loc></sitemap>
+            <sitemap><loc>second.xml</loc></sitemap>
+          </sitemapindex>
+        XML
+      )
+      File.write(
+        File.join(dir, "first.xml"),
+        <<~XML
+          <?xml version="1.0" encoding="UTF-8"?>
+          <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+            <url><loc>http://localhost:3000/first</loc></url>
+          </urlset>
+        XML
+      )
+      File.write(
+        File.join(dir, "second.xml"),
+        <<~XML
+          <?xml version="1.0" encoding="UTF-8"?>
+          <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+            <url><loc>http://localhost:3000/second</loc></url>
+          </urlset>
+        XML
+      )
+
+      executor = RecordingExecutor.new
+      parser = Crawlscope::Sitemap.new(path: File.join(dir, "sitemap.xml"), fetch_executor: executor)
+
+      assert_equal ["http://localhost:3000/first", "http://localhost:3000/second"], parser.urls(base_url: "http://localhost:3000")
+      assert_equal [[File.join(dir, "first.xml"), File.join(dir, "second.xml")]], executor.batches
     end
   end
 end

@@ -4,6 +4,8 @@ require "uri"
 
 module Crawlscope
   class Reporter
+    MAX_ISSUES_PER_GROUP = 20
+
     def initialize(io:)
       @io = io
     end
@@ -15,13 +17,13 @@ module Crawlscope
       @io.puts("URLs: #{result.urls.size}")
       @io.puts("Pages: #{result.pages.size}")
 
-      if result.ok?
+      if result.issues.size.zero?
         @io.puts("Status: OK")
         return
       end
 
-      @io.puts("Status: FAILED")
-      @io.puts("Issues: #{result.issues.size} #{severity_summary(result.issues)}")
+      @io.puts("Status: #{status_for(result.issues)}")
+      @io.puts("Issues: #{result.issues.size} total (#{severity_summary(result.issues)})")
       @io.puts("")
 
       report_summary(result.issues)
@@ -30,6 +32,18 @@ module Crawlscope
     end
 
     private
+
+    def status_for(issues)
+      grouped = issues.by_severity
+
+      if grouped.key?(:error)
+        "FAILED"
+      elsif grouped.key?(:warning)
+        "WARNINGS"
+      else
+        "NOTICES"
+      end
+    end
 
     def severity_summary(issues)
       grouped = issues.by_severity
@@ -59,10 +73,12 @@ module Crawlscope
         .each do |(category, code), grouped_issues|
           @io.puts("#{category} / #{code}: #{grouped_issues.size}")
 
-          grouped_issues.each do |issue|
+          grouped_issues.first(MAX_ISSUES_PER_GROUP).each do |issue|
             @io.puts("  - #{compact_issue(issue, base_url: base_url)}")
           end
 
+          remaining_count = grouped_issues.size - MAX_ISSUES_PER_GROUP
+          @io.puts("  ... #{remaining_count} more") if remaining_count.positive?
           @io.puts("")
         end
     end
@@ -127,7 +143,7 @@ module Crawlscope
     end
 
     def format_number(value)
-      return format("%.2f", value) if value.is_a?(Float)
+      return format("%.3f", value) if value.is_a?(Float)
 
       value.to_s
     end

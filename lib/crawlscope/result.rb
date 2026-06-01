@@ -3,7 +3,7 @@
 module Crawlscope
   Result = Data.define(:base_url, :sitemap_path, :urls, :pages, :issues) do
     def ok?
-      issues.none?(&:error?) && issues.none?(&:warning?) && issues.none?(&:notice?)
+      issues.none?(&:error?)
     end
   end
 end

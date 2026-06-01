@@ -183,7 +183,7 @@ namespace :release do
 end
 
 namespace :crawlscope do
-  desc "Validate URLs with all default Crawlscope rules. Args: [url,sitemap,rules]. ENV: URL, SITEMAP, RULES, JS=1, TIMEOUT, NETWORK_IDLE_TIMEOUT, CONCURRENCY"
+  desc "Validate URLs with all default Crawlscope rules. Args: [url,sitemap,rules]. ENV: URL, SITEMAP, RULES, JS=1, TIMEOUT, NETWORK_IDLE_TIMEOUT, CONCURRENCY, FETCH_EXECUTOR"
   task :validate, [:url, :sitemap, :rules] do |_task, args|
     Crawlscope::RakeTasks.validate(url: args[:url], sitemap_path: args[:sitemap], rule_names: args[:rules])
   end

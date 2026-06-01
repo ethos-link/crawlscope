@@ -32,6 +32,8 @@ The default rule set includes:
 
 ## Installation
 
+Crawlscope requires Ruby 3.3 or newer.
+
 Add this line to your application's Gemfile:
 
 ```ruby
@@ -166,6 +168,7 @@ Available environment overrides:
 - `TIMEOUT=30`
 - `NETWORK_IDLE_TIMEOUT=10`
 - `CONCURRENCY=5`
+- `FETCH_EXECUTOR=threaded` or `FETCH_EXECUTOR=async`
 
 Available tasks:
 
@@ -195,6 +198,11 @@ bundle exec rake 'crawlscope:validate:ldjson[https://example.com/article]'
 
 Plain `rake` does not pass `--url` style flags to tasks. Use `URL=...` or the
 task-argument form above instead.
+
+`FETCH_EXECUTOR=threaded` is the default and works with Crawlscope's required
+runtime dependencies. `FETCH_EXECUTOR=async` uses Ruby's fiber scheduler and
+Async::HTTP through Faraday, preserving the same `CONCURRENCY` bound. The CLI
+accepts the same setting with `--fetch-executor async`.
 
 `crawlscope:validate:ldjson` is separate because it directly checks the URL or semicolon-separated URLs in `URL`; it does not crawl the sitemap. Without `URL`, it checks the configured base URL, falling back to `http://localhost:3000`.
 

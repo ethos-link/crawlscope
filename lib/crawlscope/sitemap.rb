@@ -9,20 +9,31 @@ module Crawlscope
   class Sitemap
     SITEMAP_NAMESPACE = {"xmlns" => "http://www.sitemaps.org/schemas/sitemap/0.9"}.freeze
 
-    def initialize(path:)
+    def initialize(path:, adapter: nil, concurrency: Configuration::DEFAULT_CONCURRENCY, fetch_executor: Configuration::DEFAULT_FETCH_EXECUTOR, timeout_seconds: Configuration::DEFAULT_TIMEOUT_SECONDS)
       @path = path
+      @adapter = adapter
+      @concurrency = concurrency
+      @fetch_executor = fetch_executor
+      @timeout_seconds = timeout_seconds
     end
 
     def urls(base_url:)
-      collect_urls(@path, base_url: base_url, visited: Set.new).uniq
+      collect_urls(@path, base_url: base_url, visited: Set.new, visited_mutex: Mutex.new).uniq
     end
 
     private
 
-    def collect_urls(source, base_url:, visited:)
-      return [] if visited.include?(source)
+    def collect_urls(source, base_url:, visited:, visited_mutex:)
+      already_visited = visited_mutex.synchronize do
+        if visited.include?(source)
+          true
+        else
+          visited.add(source)
+          false
+        end
+      end
+      return [] if already_visited
 
-      visited.add(source)
       document = Nokogiri::XML(read(source))
       root_name = document.root&.name
       unless %w[sitemapindex urlset].include?(root_name)
@@ -30,10 +41,13 @@ module Crawlscope
       end
 
       if root_name == "sitemapindex"
-        document.xpath("//xmlns:sitemap/xmlns:loc", SITEMAP_NAMESPACE).flat_map do |node|
-          child_source = resolve_child_source(source, node.text.to_s.strip, base_url: base_url)
-          collect_urls(child_source, base_url: base_url, visited: visited)
+        child_sources = document.xpath("//xmlns:sitemap/xmlns:loc", SITEMAP_NAMESPACE).map do |node|
+          resolve_child_source(source, node.text.to_s.strip, base_url: base_url)
         end
+
+        fetch_executor.call(child_sources) do |child_source|
+          collect_urls(child_source, base_url: base_url, visited: visited, visited_mutex: visited_mutex)
+        end.flatten
       else
         document.xpath("//xmlns:url/xmlns:loc", SITEMAP_NAMESPACE).map do |node|
           Url.normalize_for_base(node.text.to_s.strip, base_url: base_url)
@@ -77,11 +91,16 @@ module Crawlscope
     end
 
     def connection
-      @connection ||= Faraday.new do |faraday|
+      Faraday.new do |faraday|
         faraday.response :follow_redirects, limit: Http::MAX_REDIRECTS
-        faraday.options.timeout = 20
-        faraday.options.open_timeout = 20
+        faraday.options.timeout = @timeout_seconds
+        faraday.options.open_timeout = @timeout_seconds
+        faraday.adapter @adapter if @adapter
       end
+    end
+
+    def fetch_executor
+      @fetch_executor_instance ||= FetchExecutor.build(name: @fetch_executor, concurrency: @concurrency)
     end
   end
 end

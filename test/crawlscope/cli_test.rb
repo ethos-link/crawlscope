@@ -4,11 +4,12 @@ require "test_helper"
 
 class CrawlscopeCliTest < Minitest::Test
   class FakeConfiguration
-    attr_accessor :base_url, :concurrency, :network_idle_timeout_seconds, :output, :renderer, :timeout_seconds
+    attr_accessor :base_url, :concurrency, :fetch_executor, :network_idle_timeout_seconds, :output, :renderer, :timeout_seconds
 
     def initialize
       @base_url = nil
       @concurrency = 10
+      @fetch_executor = :threaded
       @network_idle_timeout_seconds = 5
       @renderer = :http
       @timeout_seconds = 20
@@ -95,7 +96,7 @@ class CrawlscopeCliTest < Minitest::Test
     err = StringIO.new
 
     status = Crawlscope::Cli.start(
-      ["validate", "--url", "https://example.com", "--sitemap", "https://example.com/sitemap-pages.xml", "--rules", "metadata,links", "--renderer", "browser", "--timeout", "30", "--network-idle-timeout", "9", "--concurrency", "3"],
+      ["validate", "--url", "https://example.com", "--sitemap", "https://example.com/sitemap-pages.xml", "--rules", "metadata,links", "--renderer", "browser", "--timeout", "30", "--network-idle-timeout", "9", "--concurrency", "3", "--fetch-executor", "async"],
       out: out,
       err: err,
       configuration: configuration,
@@ -115,8 +116,22 @@ class CrawlscopeCliTest < Minitest::Test
     assert_equal 30, configuration.timeout_seconds
     assert_equal 9, configuration.network_idle_timeout_seconds
     assert_equal 3, configuration.concurrency
+    assert_equal "async", configuration.fetch_executor
     assert_same out, configuration.output
     assert_empty err.string
+  end
+
+  def test_validate_reads_fetch_executor_from_environment
+    configuration = FakeConfiguration.new
+    task = FakeTask.new
+
+    with_env("FETCH_EXECUTOR" => "async") do
+      status = Crawlscope::Cli.start(["validate", "--url", "https://example.com"], out: StringIO.new, err: StringIO.new, configuration: configuration, task: task)
+
+      assert_equal 0, status
+    end
+
+    assert_equal "async", configuration.fetch_executor
   end
 
   def test_ldjson_reads_urls_from_environment

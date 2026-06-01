@@ -134,6 +134,7 @@ module Crawlscope
 
       configure_renderer(resolved_renderer)
       @configuration.concurrency = resolved_concurrency
+      @configuration.fetch_executor = resolved_fetch_executor
       @configuration.network_idle_timeout_seconds = resolved_integer("NETWORK_IDLE_TIMEOUT", default: @configuration.network_idle_timeout_seconds, minimum: 1)
       @configuration.timeout_seconds = resolved_integer("TIMEOUT", default: @configuration.timeout_seconds, minimum: 1)
 
@@ -166,6 +167,10 @@ module Crawlscope
 
         opts.on("--concurrency COUNT", Integer, "Set crawl concurrency") do |value|
           @configuration.concurrency = integer_option(value, minimum: 1, name: "concurrency")
+        end
+
+        opts.on("--fetch-executor NAME", "Use threaded or async fetch execution") do |value|
+          @configuration.fetch_executor = value
         end
       end
 
@@ -219,6 +224,10 @@ module Crawlscope
       else
         configured_concurrency
       end
+    end
+
+    def resolved_fetch_executor
+      normalized_string(ENV["FETCH_EXECUTOR"]) || @configuration.fetch_executor
     end
 
     def resolved_integer(name, default:, minimum:)

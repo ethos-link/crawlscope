@@ -7,10 +7,11 @@ module Crawlscope
     DEFAULT_BROWSER_NETWORK_IDLE_TIMEOUT_SECONDS = 5
     DEFAULT_BROWSER_SCROLL_PAGE = true
     DEFAULT_CONCURRENCY = 10
+    DEFAULT_FETCH_EXECUTOR = :threaded
     RENDERERS = %i[http browser].freeze
     DEFAULT_TIMEOUT_SECONDS = 20
 
-    attr_writer :allowed_statuses, :base_url, :browser_factory, :concurrency, :network_idle_timeout_seconds, :output, :renderer, :rule_registry, :schema_registry, :scroll_page, :site_name, :sitemap_path, :timeout_seconds
+    attr_writer :allowed_statuses, :base_url, :browser_factory, :concurrency, :fetch_executor, :network_idle_timeout_seconds, :output, :renderer, :rule_registry, :schema_registry, :scroll_page, :site_name, :sitemap_path, :timeout_seconds
 
     def allowed_statuses
       value = resolve(@allowed_statuses)
@@ -28,6 +29,11 @@ module Crawlscope
     def concurrency
       value = resolve(@concurrency)
       positive_integer(value, default: DEFAULT_CONCURRENCY, name: "concurrency")
+    end
+
+    def fetch_executor
+      value = resolve(@fetch_executor)
+      FetchExecutor.normalize(value.nil? ? DEFAULT_FETCH_EXECUTOR : value)
     end
 
     def browser_concurrency
@@ -83,6 +89,7 @@ module Crawlscope
         sitemap_path: sitemap_path,
         browser_factory: browser_factory,
         concurrency: concurrency,
+        fetch_executor: fetch_executor,
         network_idle_timeout_seconds: network_idle_timeout_seconds,
         renderer: renderer,
         timeout_seconds: timeout_seconds,
