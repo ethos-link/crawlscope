@@ -243,6 +243,11 @@ module Crawlscope
           resolution && resolution[:html]
         end
 
+        def noindex?
+          Crawlscope::Rules::Indexability.noindex_header?(resolution[:headers] || {}) ||
+            Crawlscope::Rules::Indexability.noindex_meta?(resolution[:doc])
+        end
+
         def status
           resolution && resolution[:status]
         end
@@ -421,6 +426,7 @@ module Crawlscope
 
           target = resolve_target(final_url)
           next unless target.allowed?(@allowed_statuses) && target.html?
+          next if target.noindex?
 
           reported_urls << final_url
 

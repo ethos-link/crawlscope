@@ -3,6 +3,7 @@
 module Crawlscope
   module DocumentText
     REMOVED_SELECTORS = "script, style, noscript, template, svg"
+    CONTENT_RATIO_REMOVED_SELECTORS = "#{REMOVED_SELECTORS}, form"
     TOKEN_PATTERN = /[[:alnum:]]+/
 
     module_function
@@ -13,6 +14,10 @@ module Crawlscope
 
     def html_for(doc, selector: "main")
       root_for(doc, selector: selector)&.to_html.to_s
+    end
+
+    def content_ratio_html_for(doc, selector: "main")
+      root_for(doc, selector: selector, removed_selectors: CONTENT_RATIO_REMOVED_SELECTORS)&.to_html.to_s
     end
 
     def text_for(doc, selector: "main")
@@ -27,11 +32,11 @@ module Crawlscope
       text.to_s.gsub(/\s+/, " ").strip
     end
 
-    def root_for(doc, selector:)
+    def root_for(doc, selector:, removed_selectors: REMOVED_SELECTORS)
       return unless doc
 
       copy = doc.dup
-      copy.css(REMOVED_SELECTORS).remove
+      copy.css(removed_selectors).remove
 
       root = selector.to_s.empty? ? nil : copy.at_css(selector)
       root || copy.at_css("body") || copy

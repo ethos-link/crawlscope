@@ -242,6 +242,54 @@ class CrawlscopeLinksRuleTest < Minitest::Test
     assert_equal "https://example.com/hidden", issue.url
   end
 
+  def test_does_not_report_noindex_internal_pages_missing_from_sitemap
+    issues = Crawlscope::IssueCollection.new
+    resolver = lambda do |target_url|
+      {
+        crawled: false,
+        doc: Nokogiri::HTML("<head><meta name=\"robots\" content=\"noindex, follow\"></head>"),
+        error: nil,
+        final_url: target_url,
+        headers: {},
+        html: true,
+        status: 200
+      }
+    end
+
+    Crawlscope::Rules::Links.new.call(
+      urls: ["https://example.com/guide"],
+      pages: [page(url: "https://example.com/guide", body: "<main><a href=\"/hidden\">Hidden</a></main>")],
+      issues: issues,
+      context: context(resolver: resolver)
+    )
+
+    refute_includes issues.to_a.map(&:code), :indexable_page_missing_from_sitemap
+  end
+
+  def test_does_not_report_x_robots_noindex_internal_pages_missing_from_sitemap
+    issues = Crawlscope::IssueCollection.new
+    resolver = lambda do |target_url|
+      {
+        crawled: false,
+        doc: Nokogiri::HTML("<main>Hidden</main>"),
+        error: nil,
+        final_url: target_url,
+        headers: {"X-Robots-Tag" => "noindex"},
+        html: true,
+        status: 200
+      }
+    end
+
+    Crawlscope::Rules::Links.new.call(
+      urls: ["https://example.com/guide"],
+      pages: [page(url: "https://example.com/guide", body: "<main><a href=\"/hidden\">Hidden</a></main>")],
+      issues: issues,
+      context: context(resolver: resolver)
+    )
+
+    refute_includes issues.to_a.map(&:code), :indexable_page_missing_from_sitemap
+  end
+
   def test_reports_url_hygiene_issues
     issues = Crawlscope::IssueCollection.new
     long_path = "a" * 2_050

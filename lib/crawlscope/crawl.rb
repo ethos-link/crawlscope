@@ -126,8 +126,10 @@ module Crawlscope
     def resolution(page, normalized_url, crawled:)
       {
         crawled: crawled,
+        doc: page.doc,
         error: page.error,
         final_url: page.normalized_final_url || normalized_url,
+        headers: page.headers,
         html: page.html?,
         status: page.status
       }
