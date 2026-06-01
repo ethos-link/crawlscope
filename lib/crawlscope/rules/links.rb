@@ -48,7 +48,11 @@ module Crawlscope
 
       def extract_links(pages)
         html_pages = pages.select(&:html?)
-        parallel_map(html_pages) { |page| page_links(page) }.flatten
+        FetchExecutor.map(
+          name: @fetch_executor,
+          concurrency: @concurrency,
+          items: html_pages
+        ) { |page| page_links(page) }.flatten
       end
 
       def page_links(page)
@@ -628,12 +632,6 @@ module Crawlscope
         else
           default
         end
-      end
-
-      def parallel_map(items, &block)
-        return items.map(&block) if items.size < 2 || @fetch_executor.nil? || @concurrency.to_i <= 1
-
-        FetchExecutor.build(name: @fetch_executor, concurrency: @concurrency).call(items, &block)
       end
     end
   end

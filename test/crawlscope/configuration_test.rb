@@ -57,13 +57,20 @@ class CrawlscopeConfigurationTest < Minitest::Test
 
     assert_equal [200, 301, 302], config.allowed_statuses
     assert_equal 10, config.concurrency
-    assert_equal :threaded, config.fetch_executor
+    assert_equal :async, config.fetch_executor
     assert_equal 4, config.browser_concurrency
     assert_equal 5, config.network_idle_timeout_seconds
     assert_equal :http, config.renderer
     assert_equal 20, config.timeout_seconds
     assert_equal $stdout, config.output
     assert config.scroll_page?
+  end
+
+  def test_browser_renderer_defaults_to_threaded_fetch_executor
+    config = Crawlscope::Configuration.new
+    config.renderer = :browser
+
+    assert_equal :threaded, config.fetch_executor
   end
 
   def test_configured_values_are_normalized

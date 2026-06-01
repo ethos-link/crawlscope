@@ -15,7 +15,8 @@ Recommended migration:
 
 1. Upgrade the host application runtime to Ruby 3.3 or newer.
 2. Run `bundle update crawlscope async async-http async-http-faraday`.
-3. Keep the default `FETCH_EXECUTOR=threaded` for the first deploy if you want
-   a conservative rollout.
-4. Enable async fetching with `FETCH_EXECUTOR=async` or
-   `--fetch-executor async` after the app is running on the new Ruby version.
+3. Crawlscope now uses `FETCH_EXECUTOR=async` by default for HTTP crawling.
+4. Set `FETCH_EXECUTOR=threaded` or pass `--fetch-executor threaded` for a
+   conservative rollout or for explicit thread-pool execution.
+5. Browser rendering continues to use threaded execution by default because
+   async fetch execution is only supported with HTTP rendering.

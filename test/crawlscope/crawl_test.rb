@@ -42,6 +42,29 @@ class CrawlscopeCrawlTest < Minitest::Test
     FileUtils.rm_rf(@tmp_dir)
   end
 
+  def test_http_renderer_defaults_to_async_executor
+    crawl = Crawlscope::Crawl.new(
+      base_url: "https://example.com",
+      sitemap_path: @sitemap_path,
+      rules: [],
+      schema_registry: Crawlscope::SchemaRegistry.default
+    )
+
+    assert_equal :async, crawl.instance_variable_get(:@fetch_executor)
+  end
+
+  def test_browser_renderer_defaults_to_threaded_executor
+    crawl = Crawlscope::Crawl.new(
+      base_url: "https://example.com",
+      sitemap_path: @sitemap_path,
+      rules: [],
+      schema_registry: Crawlscope::SchemaRegistry.default,
+      renderer: :browser
+    )
+
+    assert_equal :threaded, crawl.instance_variable_get(:@fetch_executor)
+  end
+
   def test_returns_ok_when_metadata_is_valid
     File.write(
       @sitemap_path,
@@ -86,7 +109,8 @@ class CrawlscopeCrawlTest < Minitest::Test
       base_url: "https://example.com",
       sitemap_path: @sitemap_path,
       rules: Crawlscope::RuleRegistry.default(site_name: "Example").rules,
-      schema_registry: Crawlscope::SchemaRegistry.default
+      schema_registry: Crawlscope::SchemaRegistry.default,
+      fetch_executor: :threaded
     ).call
 
     assert result.ok?
@@ -127,7 +151,8 @@ class CrawlscopeCrawlTest < Minitest::Test
       base_url: "https://example.com",
       sitemap_path: @sitemap_path,
       rules: Crawlscope::RuleRegistry.default(site_name: "Example").rules,
-      schema_registry: Crawlscope::SchemaRegistry.default
+      schema_registry: Crawlscope::SchemaRegistry.default,
+      fetch_executor: :threaded
     ).call
 
     assert result.ok?
@@ -264,7 +289,8 @@ class CrawlscopeCrawlTest < Minitest::Test
       base_url: "https://example.com",
       sitemap_path: @sitemap_path,
       rules: [],
-      schema_registry: Crawlscope::SchemaRegistry.default
+      schema_registry: Crawlscope::SchemaRegistry.default,
+      fetch_executor: :threaded
     ).call
 
     assert_includes result.issues.to_a.map(&:code), :sitemap_redirect_url

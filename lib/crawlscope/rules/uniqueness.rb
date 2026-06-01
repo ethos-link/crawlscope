@@ -68,7 +68,11 @@ module Crawlscope
       def summarize_pages(pages)
         html_pages = pages.select(&:html?)
 
-        parallel_map(html_pages) { |page| summary_for(page) }
+        FetchExecutor.map(
+          name: @fetch_executor,
+          concurrency: @concurrency,
+          items: html_pages
+        ) { |page| summary_for(page) }
       end
 
       def validate_duplicates(page_summaries, issues)
@@ -191,12 +195,6 @@ module Crawlscope
         else
           default
         end
-      end
-
-      def parallel_map(items, &block)
-        return items.map(&block) if items.size < 2 || @fetch_executor.nil? || @concurrency.to_i <= 1
-
-        FetchExecutor.build(name: @fetch_executor, concurrency: @concurrency).call(items, &block)
       end
     end
   end

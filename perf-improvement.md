@@ -26,8 +26,9 @@ Defer Plan 3 until benchmarks prove the graph-level complexity is needed.
 ## Implementation Update
 
 Plan 1 has been implemented with the deliberate Ruby `>= 3.3` contract change.
-The default executor remains threaded, and `fetch_executor: :async` is now
-available for HTTP crawls through `async-http-faraday`.
+The default executor is now async for HTTP crawls through
+`async-http-faraday`, with `fetch_executor: :threaded` retained as an explicit
+fallback.
 
 The safe follow-on parallelization work is also implemented:
 

@@ -7,7 +7,7 @@ module Crawlscope
     DEFAULT_BROWSER_NETWORK_IDLE_TIMEOUT_SECONDS = 5
     DEFAULT_BROWSER_SCROLL_PAGE = true
     DEFAULT_CONCURRENCY = 10
-    DEFAULT_FETCH_EXECUTOR = :threaded
+    DEFAULT_FETCH_EXECUTOR = :async
     RENDERERS = %i[http browser].freeze
     DEFAULT_TIMEOUT_SECONDS = 20
 
@@ -33,7 +33,9 @@ module Crawlscope
 
     def fetch_executor
       value = resolve(@fetch_executor)
-      FetchExecutor.normalize(value.nil? ? DEFAULT_FETCH_EXECUTOR : value)
+      default = (renderer == :browser) ? :threaded : DEFAULT_FETCH_EXECUTOR
+
+      FetchExecutor.normalize(value.nil? ? default : value)
     end
 
     def browser_concurrency

@@ -134,6 +134,7 @@ module Crawlscope
 
       configure_renderer(resolved_renderer)
       @configuration.concurrency = resolved_concurrency
+      fetch_executor_configured = !normalized_string(ENV["FETCH_EXECUTOR"]).nil?
       @configuration.fetch_executor = resolved_fetch_executor
       @configuration.network_idle_timeout_seconds = resolved_integer("NETWORK_IDLE_TIMEOUT", default: @configuration.network_idle_timeout_seconds, minimum: 1)
       @configuration.timeout_seconds = resolved_integer("TIMEOUT", default: @configuration.timeout_seconds, minimum: 1)
@@ -170,11 +171,13 @@ module Crawlscope
         end
 
         opts.on("--fetch-executor NAME", "Use threaded or async fetch execution") do |value|
+          fetch_executor_configured = true
           @configuration.fetch_executor = value
         end
       end
 
       parser.parse!(@argv)
+      @configuration.fetch_executor = :threaded if @configuration.renderer == :browser && !fetch_executor_configured
 
       result = task.validate(
         base_url: options[:url],
@@ -227,7 +230,11 @@ module Crawlscope
     end
 
     def resolved_fetch_executor
-      normalized_string(ENV["FETCH_EXECUTOR"]) || @configuration.fetch_executor
+      configured_executor = normalized_string(ENV["FETCH_EXECUTOR"])
+      return configured_executor if configured_executor
+      return :threaded if @configuration.renderer == :browser
+
+      @configuration.fetch_executor
     end
 
     def resolved_integer(name, default:, minimum:)

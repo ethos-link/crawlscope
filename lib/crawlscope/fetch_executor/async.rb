@@ -10,22 +10,22 @@ module Crawlscope
         @concurrency = concurrency
       end
 
-      def call(urls)
-        indexed_urls = Array(urls).each_with_index.to_a
-        pages = Array.new(indexed_urls.size)
+      def call(items)
+        indexed_items = Array(items).each_with_index.to_a
+        results = Array.new(indexed_items.size)
 
         Sync do |parent|
           semaphore = ::Async::Semaphore.new(@concurrency)
-          tasks = indexed_urls.map do |url, index|
+          tasks = indexed_items.map do |item, index|
             semaphore.async(parent: parent) do
-              pages[index] = yield(url)
+              results[index] = yield(item)
             end
           end
 
           tasks.each(&:wait)
         end
 
-        pages
+        results
       end
     end
   end

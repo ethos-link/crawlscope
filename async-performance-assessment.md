@@ -149,8 +149,9 @@ Position it as:
 - potentially better at higher concurrency with lower thread pressure,
 - equivalent-to-slightly-faster than threaded for the measured local workloads.
 
-If the product goal is a reliable 2x improvement over current default threaded
-crawls, the next performance work should not be "more async." It should target:
+If the product goal is a reliable 2x improvement over the previous threaded
+baseline, the next performance work should not be "more async." It should
+target:
 
 1. persistent fetch/result caching across rule phases,
 2. optional higher concurrency with per-host rate limits,

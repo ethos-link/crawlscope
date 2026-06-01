@@ -9,7 +9,7 @@ class CrawlscopeCliTest < Minitest::Test
     def initialize
       @base_url = nil
       @concurrency = 10
-      @fetch_executor = :threaded
+      @fetch_executor = :async
       @network_idle_timeout_seconds = 5
       @renderer = :http
       @timeout_seconds = 20
@@ -132,6 +132,17 @@ class CrawlscopeCliTest < Minitest::Test
     end
 
     assert_equal "async", configuration.fetch_executor
+  end
+
+  def test_validate_uses_threaded_executor_for_browser_rendering_by_default
+    configuration = FakeConfiguration.new
+    task = FakeTask.new
+
+    status = Crawlscope::Cli.start(["validate", "--url", "https://example.com", "--renderer", "browser"], out: StringIO.new, err: StringIO.new, configuration: configuration, task: task)
+
+    assert_equal 0, status
+    assert_equal :browser, configuration.renderer
+    assert_equal :threaded, configuration.fetch_executor
   end
 
   def test_ldjson_reads_urls_from_environment

@@ -17,6 +17,13 @@ module Crawlscope
       end
     end
 
+    def map(name:, concurrency:, items:, &block)
+      items = Array(items)
+      return items.map(&block) if items.size < 2 || concurrency.to_i <= 1
+
+      build(name: name, concurrency: concurrency).call(items, &block)
+    end
+
     def normalize(name)
       return name if name.respond_to?(:call)
 

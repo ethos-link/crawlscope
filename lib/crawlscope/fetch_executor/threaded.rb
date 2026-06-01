@@ -9,23 +9,23 @@ module Crawlscope
         @concurrency = concurrency
       end
 
-      def call(urls)
-        indexed_urls = Array(urls).each_with_index.to_a
-        pages = Array.new(indexed_urls.size)
+      def call(items)
+        indexed_items = Array(items).each_with_index.to_a
+        results = Array.new(indexed_items.size)
         mutex = Mutex.new
         pool = Concurrent::FixedThreadPool.new(@concurrency)
 
-        indexed_urls.each do |url, index|
+        indexed_items.each do |item, index|
           pool.post do
-            page = yield(url)
-            mutex.synchronize { pages[index] = page }
+            result = yield(item)
+            mutex.synchronize { results[index] = result }
           end
         end
 
         pool.shutdown
         pool.wait_for_termination
 
-        pages
+        results
       end
     end
   end

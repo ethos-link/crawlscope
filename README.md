@@ -199,10 +199,11 @@ bundle exec rake 'crawlscope:validate:ldjson[https://example.com/article]'
 Plain `rake` does not pass `--url` style flags to tasks. Use `URL=...` or the
 task-argument form above instead.
 
-`FETCH_EXECUTOR=threaded` is the default and works with Crawlscope's required
-runtime dependencies. `FETCH_EXECUTOR=async` uses Ruby's fiber scheduler and
-Async::HTTP through Faraday, preserving the same `CONCURRENCY` bound. The CLI
-accepts the same setting with `--fetch-executor async`.
+`FETCH_EXECUTOR=async` is the default for HTTP crawling. It uses Ruby's fiber
+scheduler and Async::HTTP through Faraday, preserving the same `CONCURRENCY`
+bound. Use `FETCH_EXECUTOR=threaded` or `--fetch-executor threaded` for the
+thread-pool executor. Browser rendering uses the threaded executor by default
+because async fetch execution is only supported with HTTP rendering.
 
 `crawlscope:validate:ldjson` is separate because it directly checks the URL or semicolon-separated URLs in `URL`; it does not crawl the sitemap. Without `URL`, it checks the configured base URL, falling back to `http://localhost:3000`.
 

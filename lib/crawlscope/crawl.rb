@@ -2,16 +2,16 @@
 
 module Crawlscope
   class Crawl
-    def initialize(base_url:, sitemap_path:, rules:, schema_registry:, browser_factory: nil, concurrency: Configuration::DEFAULT_CONCURRENCY, fetch_executor: Configuration::DEFAULT_FETCH_EXECUTOR, network_idle_timeout_seconds: Configuration::DEFAULT_BROWSER_NETWORK_IDLE_TIMEOUT_SECONDS, renderer: :http, scroll_page: Configuration::DEFAULT_BROWSER_SCROLL_PAGE, timeout_seconds: Configuration::DEFAULT_TIMEOUT_SECONDS, allowed_statuses: Configuration::DEFAULT_ALLOWED_STATUSES)
+    def initialize(base_url:, sitemap_path:, rules:, schema_registry:, browser_factory: nil, concurrency: Configuration::DEFAULT_CONCURRENCY, fetch_executor: nil, network_idle_timeout_seconds: Configuration::DEFAULT_BROWSER_NETWORK_IDLE_TIMEOUT_SECONDS, renderer: :http, scroll_page: Configuration::DEFAULT_BROWSER_SCROLL_PAGE, timeout_seconds: Configuration::DEFAULT_TIMEOUT_SECONDS, allowed_statuses: Configuration::DEFAULT_ALLOWED_STATUSES)
       @base_url = base_url
       @sitemap_path = sitemap_path
       @rules = Array(rules)
       @schema_registry = schema_registry
       @browser_factory = browser_factory
       @concurrency = concurrency
-      @fetch_executor = fetch_executor
       @network_idle_timeout_seconds = network_idle_timeout_seconds
       @renderer = renderer.to_sym
+      @fetch_executor = fetch_executor || default_fetch_executor
       @scroll_page = scroll_page
       @timeout_seconds = timeout_seconds
       @allowed_statuses = allowed_statuses
@@ -86,6 +86,10 @@ module Crawlscope
       return unless @renderer == :browser && FetchExecutor.normalize(@fetch_executor) == :async
 
       raise ConfigurationError, "Async fetch execution is only supported with http rendering"
+    end
+
+    def default_fetch_executor
+      (@renderer == :browser) ? :threaded : Configuration::DEFAULT_FETCH_EXECUTOR
     end
 
     def context
