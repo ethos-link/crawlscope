@@ -3,6 +3,36 @@
 require "test_helper"
 
 class CrawlscopeCrawlTest < Minitest::Test
+  class RecordingExecutor
+    attr_reader :batches
+
+    def initialize
+      @batches = []
+    end
+
+    def call(urls)
+      @batches << urls
+      urls.map { |url| yield(url) }
+    end
+  end
+
+  class PageMapFetcher
+    attr_reader :closed
+
+    def initialize(pages)
+      @pages = pages
+      @closed = false
+    end
+
+    def close
+      @closed = true
+    end
+
+    def fetch(url)
+      @pages.fetch(url)
+    end
+  end
+
   def setup
     @tmp_dir = Dir.mktmpdir
     @sitemap_path = File.join(@tmp_dir, "sitemap.xml")
@@ -10,6 +40,29 @@ class CrawlscopeCrawlTest < Minitest::Test
 
   def teardown
     FileUtils.rm_rf(@tmp_dir)
+  end
+
+  def test_http_renderer_defaults_to_async_executor
+    crawl = Crawlscope::Crawl.new(
+      base_url: "https://example.com",
+      sitemap_path: @sitemap_path,
+      rules: [],
+      schema_registry: Crawlscope::SchemaRegistry.default
+    )
+
+    assert_equal :async, crawl.instance_variable_get(:@fetch_executor)
+  end
+
+  def test_browser_renderer_defaults_to_threaded_executor
+    crawl = Crawlscope::Crawl.new(
+      base_url: "https://example.com",
+      sitemap_path: @sitemap_path,
+      rules: [],
+      schema_registry: Crawlscope::SchemaRegistry.default,
+      renderer: :browser
+    )
+
+    assert_equal :threaded, crawl.instance_variable_get(:@fetch_executor)
   end
 
   def test_returns_ok_when_metadata_is_valid
@@ -56,7 +109,8 @@ class CrawlscopeCrawlTest < Minitest::Test
       base_url: "https://example.com",
       sitemap_path: @sitemap_path,
       rules: Crawlscope::RuleRegistry.default(site_name: "Example").rules,
-      schema_registry: Crawlscope::SchemaRegistry.default
+      schema_registry: Crawlscope::SchemaRegistry.default,
+      fetch_executor: :threaded
     ).call
 
     assert result.ok?
@@ -97,10 +151,11 @@ class CrawlscopeCrawlTest < Minitest::Test
       base_url: "https://example.com",
       sitemap_path: @sitemap_path,
       rules: Crawlscope::RuleRegistry.default(site_name: "Example").rules,
-      schema_registry: Crawlscope::SchemaRegistry.default
+      schema_registry: Crawlscope::SchemaRegistry.default,
+      fetch_executor: :threaded
     ).call
 
-    refute result.ok?
+    assert result.ok?
     assert_equal %i[
       incomplete_open_graph_tags
       meta_description_too_long
@@ -189,6 +244,31 @@ class CrawlscopeCrawlTest < Minitest::Test
     assert fake_browser.closed
   end
 
+  def test_async_executor_requires_http_renderer
+    File.write(
+      @sitemap_path,
+      <<~XML
+        <?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url><loc>https://example.com/pricing</loc></url>
+        </urlset>
+      XML
+    )
+
+    error = assert_raises(Crawlscope::ConfigurationError) do
+      Crawlscope::Crawl.new(
+        base_url: "https://example.com",
+        sitemap_path: @sitemap_path,
+        rules: [],
+        schema_registry: Crawlscope::SchemaRegistry.default,
+        renderer: :browser,
+        fetch_executor: :async
+      ).call
+    end
+
+    assert_equal "Async fetch execution is only supported with http rendering", error.message
+  end
+
   def test_reports_sitemap_redirect_url
     File.write(
       @sitemap_path,
@@ -209,9 +289,67 @@ class CrawlscopeCrawlTest < Minitest::Test
       base_url: "https://example.com",
       sitemap_path: @sitemap_path,
       rules: [],
-      schema_registry: Crawlscope::SchemaRegistry.default
+      schema_registry: Crawlscope::SchemaRegistry.default,
+      fetch_executor: :threaded
     ).call
 
     assert_includes result.issues.to_a.map(&:code), :sitemap_redirect_url
+  end
+
+  def test_resolves_uncrawled_link_targets_as_a_bounded_batch
+    File.write(
+      @sitemap_path,
+      <<~XML
+        <?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url><loc>https://example.com/guide</loc></url>
+        </urlset>
+      XML
+    )
+
+    executor = RecordingExecutor.new
+    fetcher = PageMapFetcher.new(
+      "https://example.com/guide" => page(
+        "https://example.com/guide",
+        "<main><a href=\"/one\">One</a><a href=\"/two\">Two</a></main>"
+      ),
+      "https://example.com/one" => page("https://example.com/one", "<main>One</main>"),
+      "https://example.com/two" => page("https://example.com/two", "<main>Two</main>")
+    )
+
+    Crawlscope::Crawl.new(
+      base_url: "https://example.com",
+      sitemap_path: @sitemap_path,
+      rules: [Crawlscope::Rules::Links.new],
+      schema_registry: Crawlscope::SchemaRegistry.default,
+      renderer: :browser,
+      browser_factory: -> { fetcher },
+      fetch_executor: executor,
+      concurrency: 2
+    ).call
+
+    assert_equal(
+      [
+        ["https://example.com/guide"],
+        ["https://example.com/one", "https://example.com/two"]
+      ],
+      executor.batches
+    )
+    assert fetcher.closed
+  end
+
+  private
+
+  def page(url, body)
+    Crawlscope::Page.new(
+      url: url,
+      normalized_url: url,
+      final_url: url,
+      normalized_final_url: url,
+      status: 200,
+      headers: {"content-type" => "text/html"},
+      body: body,
+      doc: Nokogiri::HTML(body)
+    )
   end
 end

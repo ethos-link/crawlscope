@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.description = "A small Ruby gem for sitemap-driven SEO validation with structured issues, configurable rules and schema registries, optional browser rendering, and Rails rake task integration."
   spec.homepage = "https://www.ethos-link.com/opensource/crawlscope"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 3.2.0"
+  spec.required_ruby_version = ">= 3.3.0"
 
   repo = "https://github.com/ethos-link/crawlscope"
   branch = "main"
@@ -46,6 +46,8 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   spec.add_dependency "concurrent-ruby", ">= 1.3"
+  spec.add_dependency "async", ">= 2.0"
+  spec.add_dependency "async-http-faraday", ">= 0.22"
   spec.add_dependency "faraday", ">= 2.0"
   spec.add_dependency "faraday-follow_redirects", ">= 0.3"
   spec.add_dependency "json-schema", ">= 5.0"

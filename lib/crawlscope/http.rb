@@ -10,13 +10,18 @@ module Crawlscope
     MAX_REDIRECTS = 5
     USER_AGENT = "Mozilla/5.0 (compatible; Crawlscope/1.0)"
 
-    def initialize(base_url:, timeout_seconds:)
+    def initialize(base_url:, timeout_seconds:, adapter: nil)
       @base_url = base_url
       @timeout_seconds = timeout_seconds
+      @adapter = adapter
       @connections_by_thread = Concurrent::Map.new
     end
 
     def close
+      @connections_by_thread.each_value do |connection|
+        connection.close if connection.respond_to?(:close)
+      end
+
       @connections_by_thread.clear
     end
 
@@ -65,6 +70,7 @@ module Crawlscope
           faraday.response :follow_redirects, limit: MAX_REDIRECTS
           faraday.options.timeout = @timeout_seconds
           faraday.options.open_timeout = @timeout_seconds
+          faraday.adapter @adapter if @adapter
         end
       end
     end

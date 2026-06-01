@@ -26,11 +26,10 @@ module Crawlscope
       end
 
       def call(urls:, pages:, issues:, context:)
-        page_summaries = pages.filter_map do |page|
-          next unless page.html?
+        @concurrency = context_value(context, :concurrency, default: 1)
+        @fetch_executor = context_value(context, :fetch_executor)
 
-          summary_for(page)
-        end
+        page_summaries = summarize_pages(pages)
 
         validate_duplicates(page_summaries, issues)
         validate_near_duplicates(page_summaries, issues)
@@ -64,6 +63,16 @@ module Crawlscope
           title: page.doc.at_css("title")&.text.to_s.strip,
           url: page.url
         }
+      end
+
+      def summarize_pages(pages)
+        html_pages = pages.select(&:html?)
+
+        FetchExecutor.map(
+          name: @fetch_executor,
+          concurrency: @concurrency,
+          items: html_pages
+        ) { |page| summary_for(page) }
       end
 
       def validate_duplicates(page_summaries, issues)
@@ -176,6 +185,16 @@ module Crawlscope
         return 0.0 if smaller_set_size.zero?
 
         intersection_size.to_f / smaller_set_size
+      end
+
+      def context_value(context, name, default: nil)
+        if context.respond_to?(name)
+          context.public_send(name)
+        elsif context.respond_to?(:key?) && context.key?(name)
+          context[name]
+        else
+          default
+        end
       end
     end
   end

@@ -21,8 +21,13 @@ module Crawlscope
       def call(urls:, pages:, issues:, context:)
         @allowed_statuses = context.fetch(:allowed_statuses)
         @base_url = context.fetch(:base_url)
+        @concurrency = context_value(context, :concurrency, default: 1)
+        @fetch_executor = context_value(context, :fetch_executor)
         @resolve_target = context.fetch(:resolve_target)
+        @resolve_targets = context.resolve_targets if context.respond_to?(:resolve_targets)
+        @resolve_targets ||= context[:resolve_targets] if context.respond_to?(:[])
         @base_host = URI.parse(@base_url).host
+        @resolved_targets_by_url = {}
 
         links = extract_links(pages)
         validate_url_hygiene(urls, links, issues)
@@ -42,7 +47,12 @@ module Crawlscope
       end
 
       def extract_links(pages)
-        pages.select(&:html?).flat_map { |page| page_links(page) }
+        html_pages = pages.select(&:html?)
+        FetchExecutor.map(
+          name: @fetch_executor,
+          concurrency: @concurrency,
+          items: html_pages
+        ) { |page| page_links(page) }.flatten
       end
 
       def page_links(page)
@@ -175,9 +185,12 @@ module Crawlscope
 
       def resolve_links(links, issues)
         resolved_links = []
+        grouped_links_by_target = links.group_by { |link| link[:target_url] }
+        targets_by_url = resolve_targets(grouped_links_by_target.keys)
+        @resolved_targets_by_url.merge!(targets_by_url)
 
-        links.group_by { |link| link[:target_url] }.each do |target_url, grouped_links|
-          target = resolve_target(target_url)
+        grouped_links_by_target.each do |target_url, grouped_links|
+          target = target_for(target_url)
 
           if target.unresolved?
             report_unresolved_target(target_url, grouped_links, issues, target.resolution)
@@ -219,6 +232,23 @@ module Crawlscope
       def resolve_target(target_url)
         resolution = @resolve_target.call(target_url)
         LinkTarget.new(target_url: target_url, resolution: resolution)
+      end
+
+      def resolve_targets(target_urls)
+        if @resolve_targets
+          @resolve_targets.call(target_urls).to_h do |target_url, resolution|
+            [target_url, LinkTarget.new(target_url: target_url, resolution: resolution)]
+          end
+        else
+          target_urls.to_h { |target_url| [target_url, resolve_target(target_url)] }
+        end
+      end
+
+      def target_for(target_url)
+        @resolved_targets_by_url.fetch(target_url) do
+          target = resolve_target(target_url)
+          @resolved_targets_by_url[target_url] = target
+        end
       end
 
       LinkTarget = Data.define(:target_url, :resolution) do
@@ -424,7 +454,7 @@ module Crawlscope
           next if reported_urls.include?(final_url)
           next unless crawlable_path?(link[:final_path])
 
-          target = resolve_target(final_url)
+          target = target_for(final_url)
           next unless target.allowed?(@allowed_statuses) && target.html?
           next if target.noindex?
 
@@ -506,16 +536,14 @@ module Crawlscope
         return if sitemap_pages.size < 2
 
         dofollow_counts_by_path = dofollow_counts_by_final_path(resolved_links)
+        canonical_entries = canonical_entries_for(sitemap_pages)
+        @resolved_targets_by_url.merge!(resolve_targets(canonical_entries.map { |entry| entry.fetch(:canonical_url) }))
 
-        sitemap_pages.each do |page|
-          canonical_url = canonical_url_for(page)
-          next if canonical_url.nil?
-
-          target_uri = URI.parse(canonical_url)
-          next if target_uri.host != @base_host
-
-          canonical_path = Url.path(canonical_url)
-          if canonical_path && dofollow_counts_by_path[canonical_path].zero?
+        canonical_entries.each do |entry|
+          page = entry.fetch(:page)
+          canonical_url = entry.fetch(:canonical_url)
+          canonical_path = entry.fetch(:canonical_path)
+          if canonical_path && !root_path?(canonical_path) && dofollow_counts_by_path[canonical_path].zero?
             issues.add(
               code: :canonical_no_internal_inlinks,
               severity: :warning,
@@ -527,8 +555,24 @@ module Crawlscope
           end
 
           validate_canonical_target_status(page, canonical_url, issues)
+        end
+      end
+
+      def canonical_entries_for(pages)
+        pages.filter_map do |page|
+          canonical_url = canonical_url_for(page)
+          next if canonical_url.nil?
+
+          target_uri = URI.parse(canonical_url)
+          next if target_uri.host != @base_host
+
+          {
+            canonical_path: Url.path(canonical_url),
+            canonical_url: canonical_url,
+            page: page
+          }
         rescue URI::InvalidURIError
-          next
+          nil
         end
       end
 
@@ -548,8 +592,12 @@ module Crawlscope
         Url.normalize(canonical, base_url: page.url)
       end
 
+      def root_path?(path)
+        path == "/"
+      end
+
       def validate_canonical_target_status(page, canonical_url, issues)
-        target = resolve_target(canonical_url)
+        target = target_for(canonical_url)
 
         if target.unresolved? || target.ignored_error?
           return
@@ -573,6 +621,16 @@ module Crawlscope
             message: "canonical points to HTTP #{target.status}",
             details: {canonical: canonical_url, status: target.status}
           )
+        end
+      end
+
+      def context_value(context, name, default: nil)
+        if context.respond_to?(name)
+          context.public_send(name)
+        elsif context.respond_to?(:key?) && context.key?(name)
+          context[name]
+        else
+          default
         end
       end
     end

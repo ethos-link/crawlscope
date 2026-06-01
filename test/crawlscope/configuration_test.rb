@@ -13,6 +13,7 @@ class CrawlscopeConfigurationTest < Minitest::Test
       config.sitemap_path = -> { "/tmp/sitemap.xml" }
       config.site_name = -> { "Example" }
       config.concurrency = -> { 4 }
+      config.fetch_executor = -> { :threaded }
     end
 
     audit = Crawlscope.configuration.audit
@@ -20,6 +21,7 @@ class CrawlscopeConfigurationTest < Minitest::Test
     assert_equal "https://example.com", audit.instance_variable_get(:@base_url)
     assert_equal "/tmp/sitemap.xml", audit.instance_variable_get(:@sitemap_path)
     assert_equal 4, audit.instance_variable_get(:@concurrency)
+    assert_equal :threaded, audit.instance_variable_get(:@fetch_executor)
     assert_equal %i[
       indexability
       metadata
@@ -55,6 +57,7 @@ class CrawlscopeConfigurationTest < Minitest::Test
 
     assert_equal [200, 301, 302], config.allowed_statuses
     assert_equal 10, config.concurrency
+    assert_equal :async, config.fetch_executor
     assert_equal 4, config.browser_concurrency
     assert_equal 5, config.network_idle_timeout_seconds
     assert_equal :http, config.renderer
@@ -63,10 +66,18 @@ class CrawlscopeConfigurationTest < Minitest::Test
     assert config.scroll_page?
   end
 
+  def test_browser_renderer_defaults_to_threaded_fetch_executor
+    config = Crawlscope::Configuration.new
+    config.renderer = :browser
+
+    assert_equal :threaded, config.fetch_executor
+  end
+
   def test_configured_values_are_normalized
     config = Crawlscope::Configuration.new
     config.allowed_statuses = ["200", "404"]
     config.concurrency = "2"
+    config.fetch_executor = "async"
     config.network_idle_timeout_seconds = "7"
     config.renderer = "browser"
     config.timeout_seconds = "9"
@@ -74,6 +85,7 @@ class CrawlscopeConfigurationTest < Minitest::Test
 
     assert_equal [200, 404], config.allowed_statuses
     assert_equal 2, config.concurrency
+    assert_equal :async, config.fetch_executor
     assert_equal 2, config.browser_concurrency
     assert_equal 7, config.network_idle_timeout_seconds
     assert_equal :browser, config.renderer
@@ -88,6 +100,15 @@ class CrawlscopeConfigurationTest < Minitest::Test
     error = assert_raises(Crawlscope::ConfigurationError) { config.renderer }
 
     assert_equal "Crawlscope renderer must be http or browser", error.message
+  end
+
+  def test_fetch_executor_must_be_supported
+    config = Crawlscope::Configuration.new
+    config.fetch_executor = "processes"
+
+    error = assert_raises(Crawlscope::ConfigurationError) { config.fetch_executor }
+
+    assert_equal "Crawlscope fetch_executor must be threaded or async", error.message
   end
 
   def test_numeric_values_must_be_positive_integers

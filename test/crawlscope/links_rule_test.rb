@@ -218,6 +218,33 @@ class CrawlscopeLinksRuleTest < Minitest::Test
     assert_includes codes, :canonical_points_to_redirect
   end
 
+  def test_does_not_report_missing_inlinks_for_root_canonical
+    issues = Crawlscope::IssueCollection.new
+    resolver = lambda do |target_url|
+      {crawled: true, error: nil, final_url: target_url, html: true, status: 200}
+    end
+
+    Crawlscope::Rules::Links.new.call(
+      urls: ["https://example.com/", "https://example.com/about"],
+      pages: [
+        page(
+          url: "https://example.com/",
+          body: <<~HTML
+            <html>
+              <head><link rel="canonical" href="https://example.com/"></head>
+              <body><main><a href="/about">About</a></main></body>
+            </html>
+          HTML
+        ),
+        page(url: "https://example.com/about", body: "<main><a href=\"/\">Home</a></main>")
+      ],
+      issues: issues,
+      context: context(resolver: resolver)
+    )
+
+    refute_includes issues.to_a.map(&:code), :canonical_no_internal_inlinks
+  end
+
   def test_reports_indexable_internal_pages_missing_from_sitemap
     issues = Crawlscope::IssueCollection.new
     resolver = lambda do |target_url|
@@ -346,6 +373,32 @@ class CrawlscopeLinksRuleTest < Minitest::Test
     redirect_issue = issues.to_a.find { |issue| issue.code == :internal_link_redirects }
     assert redirect_issue
     assert_includes redirect_issue.message, "https://example.com/pricing"
+  end
+
+  def test_reuses_link_target_resolution_for_later_link_checks
+    issues = Crawlscope::IssueCollection.new
+    resolution_counts = Hash.new(0)
+    resolver = lambda do |target_url|
+      resolution_counts[target_url] += 1
+      {
+        crawled: false,
+        doc: Nokogiri::HTML("<main>Hidden</main>"),
+        error: nil,
+        final_url: target_url,
+        headers: {},
+        html: true,
+        status: 200
+      }
+    end
+
+    Crawlscope::Rules::Links.new.call(
+      urls: ["https://example.com/guide"],
+      pages: [page(url: "https://example.com/guide", body: "<main><a href=\"/hidden\">Hidden</a></main>")],
+      issues: issues,
+      context: context(resolver: resolver)
+    )
+
+    assert_equal 1, resolution_counts.fetch("https://example.com/hidden")
   end
 
   def test_ignores_links_that_should_not_be_crawled
