@@ -87,6 +87,29 @@ crawlscope validate --url https://example.com --sitemap https://example.com/site
 
 Child sitemap indexes are supported automatically.
 
+Validation output is grouped for terminal scanning:
+
+```text
+Crawlscope validation
+Base URL: https://example.com
+Sitemap: https://example.com/sitemap.xml
+URLs: 24
+Pages: 24
+Status: FAILED
+Issues: 3 3 warnings
+
+Summary:
+  links            2
+  metadata         1
+
+links / low_dofollow_inlinks: 2
+  - /pricing  inbound 1/2  sources: /
+  - /features  inbound 1/2  sources: /
+
+metadata / missing_title: 1
+  - /draft  missing <title>
+```
+
 ## Ruby Usage
 
 ```ruby

@@ -27,6 +27,24 @@ class CrawlscopeContentQualityRuleTest < Minitest::Test
     refute_includes issues.to_a.map(&:code), :low_visible_text_ratio
   end
 
+  def test_visible_text_ratio_ignores_form_payload_markup
+    issues = Crawlscope::IssueCollection.new
+    page = page_with(
+      main: <<~HTML
+        <p>#{Array.new(260) { |index| "word#{index}" }.join(" ")}</p>
+        <form>
+          <div data-select-autocomplete-options-value="#{"x" * 50_000}">
+            <input type="text" name="country">
+          </div>
+        </form>
+      HTML
+    )
+
+    Crawlscope::Rules::ContentQuality.new.call(urls: [page.url], pages: [page], issues: issues)
+
+    refute_includes issues.to_a.map(&:code), :low_visible_text_ratio
+  end
+
   def test_reports_low_unique_token_ratio_for_repetitive_content
     issues = Crawlscope::IssueCollection.new
     page = page_with(main: ("hotel location service " * 100).strip)

@@ -23,11 +23,25 @@ class CrawlscopeReporterTest < Minitest::Test
     refute_includes output, "Status: FAILED"
   end
 
-  def test_reports_failed_result_with_grouped_counts_and_offenses
+  def test_reports_failed_result_with_grouped_one_line_issues
     io = StringIO.new
     issues = Crawlscope::IssueCollection.new
+    4.times do |index|
+      issues.add(
+        code: :low_dofollow_inlinks,
+        severity: :warning,
+        category: :links,
+        url: "https://example.com/page-#{index + 1}",
+        message: "dofollow inbound links 1 below 2",
+        details: {
+          dofollow_inbound_count: 1,
+          minimum: 2,
+          source_urls: ["https://example.com/source-#{index + 1}"]
+        }
+      )
+    end
     issues.add(code: :missing_title, severity: :warning, category: :metadata, url: "https://example.com/a", message: "missing <title>", details: {})
-    issues.add(code: :broken_internal_link, severity: :notice, category: :links, url: "https://example.com/b", message: "broken internal link", details: {})
+
     result = Crawlscope::Result.new(
       base_url: "https://example.com",
       sitemap_path: "/tmp/sitemap.xml",
@@ -41,14 +55,45 @@ class CrawlscopeReporterTest < Minitest::Test
     output = io.string
 
     assert_includes output, "Status: FAILED"
-    assert_includes output, "Issues: 2"
-    assert_includes output, "Severity:"
-    assert_includes output, "notice: 1"
-    assert_includes output, "warning: 1"
-    assert_includes output, "Category:"
-    assert_includes output, "links: 1"
-    assert_includes output, "metadata: 1"
-    assert_includes output, "  - [warning] missing_title https://example.com/a missing <title>"
-    assert_includes output, "  - [notice] broken_internal_link https://example.com/b broken internal link"
+    assert_includes output, "Issues: 5 5 warnings"
+    assert_includes output, "Summary:"
+    assert_includes output, "links / low_dofollow_inlinks: 4"
+    assert_includes output, "  - /page-1  inbound 1/2  sources: /source-1"
+    assert_includes output, "  - /page-4  inbound 1/2  sources: /source-4"
+    assert_includes output, "metadata / missing_title: 1"
+    refute_includes output, "Severity:"
+    refute_includes output, "Category:"
+    refute_includes output, "... 1 more"
+  end
+
+  def test_reports_source_details_on_one_line
+    io = StringIO.new
+    issues = Crawlscope::IssueCollection.new
+    4.times do |index|
+      issues.add(
+        code: :indexable_page_missing_from_sitemap,
+        severity: :warning,
+        category: :sitemaps,
+        url: "https://example.com/overview-#{index + 1}",
+        message: "indexable internal page is missing from sitemap",
+        details: {source_url: "https://example.com/source-#{index + 1}"}
+      )
+    end
+
+    result = Crawlscope::Result.new(
+      base_url: "https://example.com",
+      sitemap_path: "/tmp/sitemap.xml",
+      urls: ["https://example.com"],
+      pages: [Object.new],
+      issues: issues
+    )
+
+    Crawlscope::Reporter.new(io: io).report(result)
+
+    output = io.string
+
+    assert_includes output, "sitemaps / indexable_page_missing_from_sitemap: 4"
+    assert_includes output, "  - /overview-1  indexable internal page is missing from sitemap  source: /source-1"
+    assert_includes output, "  - /overview-4  indexable internal page is missing from sitemap  source: /source-4"
   end
 end

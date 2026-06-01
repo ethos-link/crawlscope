@@ -55,7 +55,7 @@ module Crawlscope
       end
 
       def validate_visible_text_ratio(page, issues)
-        html_bytes = DocumentText.html_for(page.doc).bytesize
+        html_bytes = DocumentText.content_ratio_html_for(page.doc).bytesize
         return if html_bytes.zero?
 
         visible_text = DocumentText.text_for(page.doc)

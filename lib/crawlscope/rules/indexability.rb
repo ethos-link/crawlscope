@@ -6,6 +6,31 @@ module Crawlscope
       ROBOTS_META_SELECTOR = 'meta[name="robots"], meta[name="googlebot"]'
       X_ROBOTS_TAG_HEADER = "x-robots-tag"
 
+      def self.noindex_header?(headers)
+        noindex?(header_value(headers, X_ROBOTS_TAG_HEADER))
+      end
+
+      def self.noindex_meta?(doc)
+        return false unless doc
+
+        doc.css(ROBOTS_META_SELECTOR).any? { |tag| noindex?(tag["content"].to_s) }
+      end
+
+      def self.header_value(headers, name)
+        headers.find { |key, _value| key.to_s.casecmp?(name) }&.last.to_s
+      end
+
+      def self.directives(value)
+        value
+          .split(",")
+          .map { |directive| directive.split(":", 2).last.to_s.strip }
+          .reject(&:empty?)
+      end
+
+      def self.noindex?(value)
+        directives(value).any? { |directive| directive.casecmp?("noindex") || directive.casecmp?("none") }
+      end
+
       attr_reader :code
 
       def initialize
@@ -28,18 +53,15 @@ module Crawlscope
       end
 
       def header_value(page, name)
-        page.headers.find { |key, _value| key.to_s.casecmp?(name) }&.last.to_s
+        self.class.header_value(page.headers, name)
       end
 
       def directives(value)
-        value
-          .split(",")
-          .map { |directive| directive.split(":", 2).last.to_s.strip }
-          .reject(&:empty?)
+        self.class.directives(value)
       end
 
       def noindex?(value)
-        directives(value).any? { |directive| directive.casecmp?("noindex") || directive.casecmp?("none") }
+        self.class.noindex?(value)
       end
 
       def follow?(value)
