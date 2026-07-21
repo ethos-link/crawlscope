@@ -27,6 +27,7 @@ module Crawlscope
 end
 
 Crawlscope.instance_variable_set(:@loader, Zeitwerk::Loader.for_gem)
+Crawlscope.loader.ignore("#{__dir__}/generators")
 Crawlscope.loader.ignore("#{__dir__}/tasks")
 Crawlscope.loader.ignore("#{__dir__}/crawlscope/railtie.rb")
 Crawlscope.loader.ignore("#{__dir__}/crawlscope/tasks.rb")

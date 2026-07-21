@@ -146,20 +146,18 @@ puts result.issues.to_a.map(&:message)
 
 ## Rails Usage
 
-For an app that uses Crawlscope through rake tasks, load the task entrypoint
-only when a Crawlscope task is requested. In the application's `Rakefile`,
-before `require_relative "config/application"`:
+Run the install generator after adding the gem:
 
-```ruby
-list_tasks = Rake.application.options.show_tasks || ARGV.any? { |argument| ["-T", "--tasks"].include?(argument) }
-require "crawlscope/tasks" if list_tasks || ARGV.any? { |argument| argument.start_with?("crawlscope:") }
+```bash
+bin/rails generate crawlscope:install
 ```
 
-This preserves `bin/rails --tasks` and the `crawlscope:*` tasks without loading
-Crawlscope during normal Rails boot. Runtime callers should explicitly
-`require "crawlscope"` immediately before configuring or using the gem.
+The generator creates `config/initializers/crawlscope.rb` with an idempotent
+`CrawlscopeConfiguration.apply` loader and adds conditional `crawlscope/tasks`
+loading to the application's `Rakefile`. This preserves `bin/rails --tasks` and
+the `crawlscope:*` tasks without loading Crawlscope during normal Rails boot.
 
-In an initializer:
+Customize the `Crawlscope.configure` block inside the generated initializer:
 
 ```ruby
 Crawlscope.configure do |config|
@@ -169,6 +167,17 @@ Crawlscope.configure do |config|
   config.schema_registry = -> { Crawlscope::SchemaRegistry.default }
 end
 ```
+
+Runtime callers must apply the generated configuration before using
+Crawlscope:
+
+```ruby
+CrawlscopeConfiguration.apply
+Crawlscope.configuration.audit
+```
+
+Rake tasks apply it automatically because `crawlscope/tasks` loads the gem
+before Rails evaluates the initializer.
 
 Then run:
 
