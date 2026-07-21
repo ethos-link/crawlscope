@@ -37,8 +37,12 @@ Crawlscope requires Ruby 3.3 or newer.
 Add this line to your application's Gemfile:
 
 ```ruby
-gem "crawlscope"
+gem "crawlscope", require: false
 ```
+
+`require: false` keeps Crawlscope and its crawl stack out of normal Rails web
+and job process boot. Require `crawlscope` at the application boundary that
+runs an audit, or use the task setup below.
 
 And then execute:
 
@@ -141,6 +145,19 @@ puts result.issues.to_a.map(&:message)
 `result.ok?` returns `false` if any error, warning, or notice is present.
 
 ## Rails Usage
+
+For an app that uses Crawlscope through rake tasks, load the task entrypoint
+only when a Crawlscope task is requested. In the application's `Rakefile`,
+before `require_relative "config/application"`:
+
+```ruby
+list_tasks = Rake.application.options.show_tasks || ARGV.any? { |argument| ["-T", "--tasks"].include?(argument) }
+require "crawlscope/tasks" if list_tasks || ARGV.any? { |argument| argument.start_with?("crawlscope:") }
+```
+
+This preserves `bin/rails --tasks` and the `crawlscope:*` tasks without loading
+Crawlscope during normal Rails boot. Runtime callers should explicitly
+`require "crawlscope"` immediately before configuring or using the gem.
 
 In an initializer:
 
