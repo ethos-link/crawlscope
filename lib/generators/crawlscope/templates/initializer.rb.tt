@@ -1,0 +1,27 @@
+# frozen_string_literal: true
+
+module CrawlscopeConfiguration
+  MUTEX = Mutex.new
+
+  def self.apply
+    return if @applied
+
+    MUTEX.synchronize do
+      return if @applied
+
+      require "crawlscope"
+
+      Crawlscope.configure do |config|
+        config.base_url = -> { ENV.fetch("CRAWLSCOPE_BASE_URL", "http://localhost:3000") }
+        config.sitemap_path = lambda {
+          ENV.fetch("SITEMAP", Rails.public_path.join("sitemap.xml").to_s)
+        }
+        config.site_name = ENV.fetch("CRAWLSCOPE_SITE_NAME", "Application")
+      end
+
+      @applied = true
+    end
+  end
+end
+
+CrawlscopeConfiguration.apply if defined?(Crawlscope)
