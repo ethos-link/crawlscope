@@ -142,7 +142,8 @@ puts result.issues.to_a.map(&:message)
 - `pages`: fetched page snapshots
 - `issues`: structured issues with `code`, `severity`, `category`, `url`, and `message`
 
-`result.ok?` returns `false` if any error, warning, or notice is present.
+`result.ok?` returns `false` when an error is present. Warnings and notices
+remain available through `result.issues` without making the result fail.
 
 ## Rails Usage
 
@@ -177,7 +178,10 @@ Crawlscope.configuration.audit
 ```
 
 Rake tasks apply it automatically because `crawlscope/tasks` loads the gem
-before Rails evaluates the initializer.
+before Rails evaluates the initializer. Each Rake entry point passes the shared
+`Crawlscope.configuration` object to the CLI, so configured base URLs, sitemap
+paths, registries, and runtime settings are preserved unless a task argument or
+environment override replaces them.
 
 Then run:
 
@@ -220,7 +224,12 @@ bundle exec rake crawlscope:validate:ldjson URL=https://example.com/article
 bundle exec rake 'crawlscope:validate:ldjson[https://example.com/article]'
 ```
 
-`crawlscope:validate` runs all default sitemap rules: indexability, metadata, structured data, uniqueness, content quality, and links. `URL` is the site base. Without `SITEMAP`, Crawlscope uses `/sitemap.xml`. With `SITEMAP`, Crawlscope uses `URL` as the site base and validates URLs from that sitemap. `SITEMAP` may be a full URL or a local file path.
+`crawlscope:validate` runs all default sitemap rules: indexability, metadata,
+structured data, uniqueness, content quality, and links. `URL` is the site
+base. Without `SITEMAP`, Crawlscope uses the configured sitemap path, then
+falls back to `/sitemap.xml`. With `SITEMAP`, Crawlscope uses `URL` as the site
+base and validates URLs from that sitemap. `SITEMAP` may be a full URL or a
+local file path.
 
 Plain `rake` does not pass `--url` style flags to tasks. Use `URL=...` or the
 task-argument form above instead.

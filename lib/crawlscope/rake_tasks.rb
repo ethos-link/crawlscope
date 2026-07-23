@@ -16,8 +16,8 @@ module Crawlscope
       validate(url: url, sitemap_path: sitemap_path, rule_names: rule)
     end
 
-    def run(command, argv: [])
-      status = Cli.start([command, *argv], out: $stdout, err: $stderr)
+    def run(command, argv: [], configuration: Crawlscope.configuration)
+      status = Cli.start([command, *argv], out: $stdout, err: $stderr, configuration: configuration)
       exit(status) unless status.zero?
     end
 

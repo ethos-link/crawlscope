@@ -3,6 +3,8 @@
 require "test_helper"
 
 class CrawlscopeRakeTasksTest < Minitest::Test
+  Rule = Data.define(:code)
+
   def setup
     @original_start = Crawlscope::Cli.method(:start)
   end
@@ -13,6 +15,7 @@ class CrawlscopeRakeTasksTest < Minitest::Test
     singleton_class.define_method(:start) do |*args, **kwargs|
       original_start.call(*args, **kwargs)
     end
+    Crawlscope.reset!
   end
 
   def test_validate_passes_rake_arguments_to_cli
@@ -56,14 +59,43 @@ class CrawlscopeRakeTasksTest < Minitest::Test
     )
   end
 
+  def test_run_passes_the_shared_configuration_to_cli
+    calls = capture_cli_calls
+    configuration = Crawlscope.configuration
+
+    Crawlscope::RakeTasks.run("validate")
+
+    assert_same configuration, calls.fetch(0).fetch(:kwargs).fetch(:configuration)
+  end
+
+  def test_validate_passes_the_host_rule_registry_to_cli
+    registry = Crawlscope::RuleRegistry.new(rules: [Rule.new(:host)], default_codes: [:host])
+    Crawlscope.configure { |configuration| configuration.rule_registry = registry }
+    calls = capture_cli_calls
+
+    Crawlscope::RakeTasks.validate
+
+    call = calls.fetch(0)
+    assert_equal "validate", call.fetch(:argv).first
+    assert_same registry, call.fetch(:kwargs).fetch(:configuration).rule_registry
+  end
+
+  def test_run_exits_with_a_nonzero_cli_status
+    capture_cli_calls(status: 2)
+
+    error = assert_raises(SystemExit) { Crawlscope::RakeTasks.run("validate") }
+
+    assert_equal 2, error.status
+  end
+
   private
 
-  def capture_cli_calls
+  def capture_cli_calls(status: 0)
     calls = []
     singleton_class = class << Crawlscope::Cli; self; end
     singleton_class.define_method(:start) do |argv, **kwargs|
       calls << {argv: argv, kwargs: kwargs}
-      0
+      status
     end
     calls
   end
