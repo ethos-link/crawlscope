@@ -5,5 +5,9 @@ module Crawlscope
     def ok?
       issues.none?(&:error?)
     end
+
+    def server_timing_summary
+      ServerTiming::Summary.new(pages)
+    end
   end
 end

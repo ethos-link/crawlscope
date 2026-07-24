@@ -141,9 +141,54 @@ puts result.issues.to_a.map(&:message)
 - `urls`: sitemap URLs selected for validation
 - `pages`: fetched page snapshots
 - `issues`: structured issues with `code`, `severity`, `category`, `url`, and `message`
+- `server_timing_summary`: aggregate response timing data when pages publish it
 
 `result.ok?` returns `false` when an error is present. Warnings and notices
 remain available through `result.issues` without making the result fail.
+
+## Server Timing
+
+Crawlscope parses the
+[`Server-Timing`](https://www.w3.org/TR/server-timing/) response header for both
+HTTP and browser-rendered crawls. Each page exposes its parsed header through
+`page.server_timing`:
+
+```ruby
+page.server_timing.each do |metric|
+  puts [metric.name, metric.duration, metric.description].compact.join(": ")
+end
+```
+
+The validation report adds a `Server Timing` section only when at least one page
+publishes the header. It includes:
+
+- header coverage and the number of pages publishing durations
+- sample and page counts with average, p50, p95, and maximum per metric
+- non-duration signals, including cache status and routing descriptions
+- the ten pages with the largest individual metric
+- the number of malformed entries ignored during parsing
+
+`dur` values are reported as milliseconds, as recommended by the specification.
+Crawlscope does not add durations together because metrics such as `total`,
+`app`, and `db` may overlap. A page's worst-offender entry is its largest
+individual metric instead.
+
+The current HTTP and browser transports expose response headers, not response
+trailers. Metrics published only in a `Server-Timing` trailer are therefore not
+available to Crawlscope.
+
+Rails 8 applications can enable `ActionDispatch::ServerTiming` with:
+
+```ruby
+config.server_timing = true
+```
+
+New Rails applications enable it in development by default; production remains
+opt-in. Rails publishes the Active Support notification names observed during
+each request and sums repeated events with the same name. The exact metrics
+therefore depend on the application and request, but commonly include controller,
+view, database, and cache instrumentation. Crawlscope accepts Rails' dotted
+metric names and reports each metric independently.
 
 ## Rails Usage
 

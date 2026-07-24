@@ -6,6 +6,18 @@ behavior.
 
 ## Next Release
 
+### Server-Timing report output
+
+No host configuration is required. When one or more responses publish a
+`Server-Timing` header, the text report now includes an optional `Server Timing`
+section. Host applications that parse report text should accept this additional
+section.
+
+Parsed metrics are available through `page.server_timing`, and aggregate data is
+available through `result.server_timing_summary`. Crawlscope interprets `dur`
+values as milliseconds and ignores malformed entries while reporting their
+count.
+
 ### Ruby 3.3 is now required
 
 Crawlscope now depends on the current Async runtime for production async HTTP

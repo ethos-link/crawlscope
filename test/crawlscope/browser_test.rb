@@ -61,7 +61,15 @@ class CrawlscopeBrowserTest < Minitest::Test
   end
 
   def test_fetch_returns_rendered_page
-    network = FakeNetwork.new(response: Response.new(url: "https://example.com/final", headers: {"content-type" => "text/html"}))
+    network = FakeNetwork.new(
+      response: Response.new(
+        url: "https://example.com/final",
+        headers: {
+          "content-type" => "text/html",
+          "server-timing" => "app;dur=47.2"
+        }
+      )
+    )
     page = FakePage.new(network: network, body: "<html><body>Hello</body></html>")
     browser = browser_with(page: page, scroll_page: false)
 
@@ -73,6 +81,7 @@ class CrawlscopeBrowserTest < Minitest::Test
     assert_equal "https://example.com/final", result.normalized_final_url
     assert_equal 200, result.status
     assert result.html?
+    assert_equal 47.2, result.server_timing.first.duration
     assert_equal [], page.evaluations
   end
 

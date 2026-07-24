@@ -5,13 +5,24 @@ require "test_helper"
 class CrawlscopeHttpTest < Minitest::Test
   def test_fetch_parses_html_response
     stub_request(:get, "https://example.com/page")
-      .to_return(status: 200, headers: {"Content-Type" => "text/html"}, body: "<html><body>Hello</body></html>")
+      .to_return(
+        status: 200,
+        headers: {
+          "Content-Type" => "text/html",
+          "Server-Timing" => 'db;dur=12.5;desc="Primary database"'
+        },
+        body: "<html><body>Hello</body></html>"
+      )
 
     page = Crawlscope::Http.new(base_url: "https://example.com", timeout_seconds: 2).fetch("https://example.com/page")
 
     assert_equal 200, page.status
     assert page.html?
     assert_equal "Hello", page.doc.at_css("body").text
+    timing = page.server_timing
+    assert_same timing, page.server_timing
+    assert_equal 12.5, timing.first.duration
+    assert_equal "Primary database", timing.first.description
   end
 
   def test_fetch_parses_responses_without_content_type_as_html

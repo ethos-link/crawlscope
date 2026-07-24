@@ -19,13 +19,18 @@ module Crawlscope
 
       if result.issues.size.zero?
         @io.puts("Status: OK")
-        return
+      else
+        @io.puts("Status: #{status_for(result.issues)}")
+        @io.puts("Issues: #{result.issues.size} total (#{severity_summary(result.issues)})")
       end
 
-      @io.puts("Status: #{status_for(result.issues)}")
-      @io.puts("Issues: #{result.issues.size} total (#{severity_summary(result.issues)})")
-      @io.puts("")
+      ServerTiming::Reporter.new(io: @io).report(
+        result.server_timing_summary,
+        base_url: result.base_url
+      )
+      return if result.issues.size.zero?
 
+      @io.puts("")
       report_summary(result.issues)
       @io.puts("")
       report_issue_groups(result.issues, base_url: result.base_url)
