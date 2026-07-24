@@ -14,6 +14,7 @@ class CrawlscopeConfigurationTest < Minitest::Test
       config.site_name = -> { "Example" }
       config.concurrency = -> { 4 }
       config.fetch_executor = -> { :threaded }
+      config.profile_token = -> { "profile-token" }
     end
 
     audit = Crawlscope.configuration.audit
@@ -22,6 +23,7 @@ class CrawlscopeConfigurationTest < Minitest::Test
     assert_equal "/tmp/sitemap.xml", audit.instance_variable_get(:@sitemap_path)
     assert_equal 4, audit.instance_variable_get(:@concurrency)
     assert_equal :threaded, audit.instance_variable_get(:@fetch_executor)
+    assert_equal "profile-token", audit.instance_variable_get(:@profile_token)
     assert_equal %i[
       indexability
       metadata
@@ -63,6 +65,7 @@ class CrawlscopeConfigurationTest < Minitest::Test
     assert_equal :http, config.renderer
     assert_equal 20, config.timeout_seconds
     assert_equal $stdout, config.output
+    assert_nil config.profile_token
     assert config.scroll_page?
   end
 

@@ -14,13 +14,14 @@ class CrawlscopeBrowserTest < Minitest::Test
   end
 
   class FakeNetwork
-    attr_reader :cleared, :idle_waits, :status
+    attr_reader :cleared, :idle_waits, :interceptions, :status
 
     def initialize(response:, status: 200)
       @response = response
       @status = status
       @cleared = []
       @idle_waits = []
+      @interceptions = []
     end
 
     def clear(scope)
@@ -28,6 +29,10 @@ class CrawlscopeBrowserTest < Minitest::Test
     end
 
     attr_reader :response
+
+    def intercept(**options)
+      @interceptions << options
+    end
 
     def wait_for_idle(duration:, timeout:)
       @idle_waits << {duration: duration, timeout: timeout}
@@ -43,6 +48,7 @@ class CrawlscopeBrowserTest < Minitest::Test
       @current_url = current_url
       @url = url
       @evaluations = []
+      @callbacks = {}
     end
 
     attr_reader :body
@@ -57,7 +63,28 @@ class CrawlscopeBrowserTest < Minitest::Test
       @visited_url = url
     end
 
+    def on(event, &callback)
+      @callbacks[event] = callback
+    end
+
+    def publish(event, value)
+      @callbacks.fetch(event).call(value)
+    end
+
     attr_reader :url
+  end
+
+  class FakeRequest
+    attr_reader :continued_headers, :headers, :url
+
+    def initialize(url:, headers: {})
+      @url = url
+      @headers = headers
+    end
+
+    def continue(headers:)
+      @continued_headers = headers.to_h { |header| [header.fetch(:name), header.fetch(:value)] }
+    end
   end
 
   def test_fetch_returns_rendered_page
@@ -95,6 +122,21 @@ class CrawlscopeBrowserTest < Minitest::Test
     assert_equal "https://example.com/current", result.final_url
     assert_equal 3, page.evaluations.size
     assert_equal 4, network.idle_waits.size
+  end
+
+  def test_profile_token_is_limited_to_same_origin_documents
+    network = FakeNetwork.new(response: nil)
+    page = FakePage.new(network: network)
+    browser_with(page: page, profile_token: "profile-token")
+    same_origin_request = FakeRequest.new(url: "https://example.com/page")
+    cross_origin_request = FakeRequest.new(url: "https://cdn.example.net/frame")
+
+    page.publish(:request, same_origin_request)
+    page.publish(:request, cross_origin_request)
+
+    assert_equal [{resource_type: :document}], network.interceptions
+    assert_equal "profile-token", same_origin_request.continued_headers.fetch("X-Profile-Token")
+    refute_includes cross_origin_request.continued_headers, "X-Profile-Token"
   end
 
   def test_fetch_falls_back_to_page_url_and_original_url
@@ -151,14 +193,16 @@ class CrawlscopeBrowserTest < Minitest::Test
 
   private
 
-  def browser_with(page: FakePage.new(network: FakeNetwork.new(response: nil)), browser: FakeBrowser.new, scroll_page: false)
+  def browser_with(page: FakePage.new(network: FakeNetwork.new(response: nil)), browser: FakeBrowser.new, profile_token: nil, scroll_page: false)
     Crawlscope::Browser.allocate.tap do |instance|
       instance.instance_variable_set(:@base_url, "https://example.com")
       instance.instance_variable_set(:@timeout_seconds, 20)
       instance.instance_variable_set(:@network_idle_timeout_seconds, 5)
+      instance.instance_variable_set(:@profile_token, profile_token)
       instance.instance_variable_set(:@scroll_page, scroll_page)
       instance.instance_variable_set(:@browser, browser)
       instance.instance_variable_set(:@page, page)
+      instance.send(:configure_profile_requests)
     end
   end
 end

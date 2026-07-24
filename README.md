@@ -183,6 +183,14 @@ Rails 8 applications can enable `ActionDispatch::ServerTiming` with:
 config.server_timing = true
 ```
 
+Applications that expose timing only to authenticated diagnostics can set
+`config.profile_token`. When this value is present, Crawlscope sends it as
+`X-Profile-Token` on same-origin sitemap, HTTP, and browser document requests.
+The header survives same-origin redirects but is removed before a cross-origin
+redirect, and browser subresources never receive it. Keep the token in the host
+application's secret store rather than a URL, command argument, report, or
+checked-in configuration.
+
 New Rails applications enable it in development by default; production remains
 opt-in. Rails publishes the Active Support notification names observed during
 each request and sums repeated events with the same name. The exact metrics
@@ -209,6 +217,7 @@ Customize the `Crawlscope.configure` block inside the generated initializer:
 Crawlscope.configure do |config|
   config.base_url = -> { "https://example.com" }
   config.sitemap_path = -> { Rails.public_path.join("sitemap.xml").to_s }
+  config.profile_token = -> { Rails.application.credentials.dig(:performance, :profile_token) }
   config.site_name = "Example"
   config.schema_registry = -> { Crawlscope::SchemaRegistry.default }
 end

@@ -11,7 +11,7 @@ module Crawlscope
     RENDERERS = %i[http browser].freeze
     DEFAULT_TIMEOUT_SECONDS = 20
 
-    attr_writer :allowed_statuses, :base_url, :browser_factory, :concurrency, :fetch_executor, :network_idle_timeout_seconds, :output, :renderer, :rule_registry, :schema_registry, :scroll_page, :site_name, :sitemap_path, :timeout_seconds
+    attr_writer :allowed_statuses, :base_url, :browser_factory, :concurrency, :fetch_executor, :network_idle_timeout_seconds, :output, :profile_token, :renderer, :rule_registry, :schema_registry, :scroll_page, :site_name, :sitemap_path, :timeout_seconds
 
     def allowed_statuses
       value = resolve(@allowed_statuses)
@@ -59,6 +59,10 @@ module Crawlscope
       value.nil? ? $stdout : value
     end
 
+    def profile_token
+      resolve(@profile_token)
+    end
+
     def renderer
       value = resolve(@renderer)
       normalized_value = value.to_s.strip
@@ -93,6 +97,7 @@ module Crawlscope
         concurrency: concurrency,
         fetch_executor: fetch_executor,
         network_idle_timeout_seconds: network_idle_timeout_seconds,
+        profile_token: profile_token,
         renderer: renderer,
         timeout_seconds: timeout_seconds,
         allowed_statuses: allowed_statuses,

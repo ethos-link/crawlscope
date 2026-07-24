@@ -34,6 +34,54 @@ class CrawlscopeHttpTest < Minitest::Test
     assert page.html?
   end
 
+  def test_fetch_sends_profile_token_to_same_origin_requests
+    request = stub_request(:get, "https://example.com/page")
+      .with(headers: {"X-Profile-Token" => "profile-token"})
+      .to_return(status: 200, body: "<html></html>")
+
+    Crawlscope::Http.new(
+      base_url: "https://example.com",
+      timeout_seconds: 2,
+      profile_token: "profile-token"
+    ).fetch("https://example.com/page")
+
+    assert_requested request
+  end
+
+  def test_fetch_preserves_profile_token_on_same_origin_redirects
+    stub_request(:get, "https://example.com/start")
+      .with(headers: {"X-Profile-Token" => "profile-token"})
+      .to_return(status: 302, headers: {"Location" => "/final"})
+    final_request = stub_request(:get, "https://example.com/final")
+      .with(headers: {"X-Profile-Token" => "profile-token"})
+      .to_return(status: 200, body: "<html></html>")
+
+    Crawlscope::Http.new(
+      base_url: "https://example.com",
+      timeout_seconds: 2,
+      profile_token: "profile-token"
+    ).fetch("https://example.com/start")
+
+    assert_requested final_request
+  end
+
+  def test_fetch_removes_profile_token_from_cross_origin_redirects
+    stub_request(:get, "https://example.com/start")
+      .with(headers: {"X-Profile-Token" => "profile-token"})
+      .to_return(status: 302, headers: {"Location" => "https://other.example/final"})
+    final_request = stub_request(:get, "https://other.example/final")
+      .with { |request| !request.headers.key?("X-Profile-Token") }
+      .to_return(status: 200, body: "<html></html>")
+
+    Crawlscope::Http.new(
+      base_url: "https://example.com",
+      timeout_seconds: 2,
+      profile_token: "profile-token"
+    ).fetch("https://example.com/start")
+
+    assert_requested final_request
+  end
+
   def test_fetch_leaves_non_html_response_unparsed
     stub_request(:get, "https://example.com/feed.xml")
       .to_return(status: 200, headers: {"content-type" => "application/xml"}, body: "<feed></feed>")

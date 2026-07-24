@@ -10,10 +10,11 @@ module Crawlscope
     MAX_REDIRECTS = 5
     USER_AGENT = "Mozilla/5.0 (compatible; Crawlscope/1.0)"
 
-    def initialize(base_url:, timeout_seconds:, adapter: nil)
+    def initialize(base_url:, timeout_seconds:, adapter: nil, profile_token: nil)
       @base_url = base_url
       @timeout_seconds = timeout_seconds
       @adapter = adapter
+      @profile_token = profile_token
       @connections_by_thread = Concurrent::Map.new
     end
 
@@ -28,6 +29,12 @@ module Crawlscope
     def fetch(url)
       response = connection.get(url) do |request|
         request.headers["User-Agent"] = USER_AGENT
+        RequestHeaders.add_profile_token(
+          request.headers,
+          url: url,
+          base_url: @base_url,
+          profile_token: @profile_token
+        )
       end
 
       final_url = response.env.url.to_s
@@ -67,7 +74,11 @@ module Crawlscope
     def connection
       @connections_by_thread.compute_if_absent(Thread.current.object_id) do
         Faraday.new do |faraday|
-          faraday.response :follow_redirects, limit: MAX_REDIRECTS
+          faraday.response(
+            :follow_redirects,
+            limit: MAX_REDIRECTS,
+            callback: RequestHeaders.method(:strip_profile_token_on_cross_origin_redirect)
+          )
           faraday.options.timeout = @timeout_seconds
           faraday.options.open_timeout = @timeout_seconds
           faraday.adapter @adapter if @adapter

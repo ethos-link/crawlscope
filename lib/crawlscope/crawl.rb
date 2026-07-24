@@ -2,7 +2,7 @@
 
 module Crawlscope
   class Crawl
-    def initialize(base_url:, sitemap_path:, rules:, schema_registry:, browser_factory: nil, concurrency: Configuration::DEFAULT_CONCURRENCY, fetch_executor: nil, network_idle_timeout_seconds: Configuration::DEFAULT_BROWSER_NETWORK_IDLE_TIMEOUT_SECONDS, renderer: :http, scroll_page: Configuration::DEFAULT_BROWSER_SCROLL_PAGE, timeout_seconds: Configuration::DEFAULT_TIMEOUT_SECONDS, allowed_statuses: Configuration::DEFAULT_ALLOWED_STATUSES)
+    def initialize(base_url:, sitemap_path:, rules:, schema_registry:, browser_factory: nil, concurrency: Configuration::DEFAULT_CONCURRENCY, fetch_executor: nil, network_idle_timeout_seconds: Configuration::DEFAULT_BROWSER_NETWORK_IDLE_TIMEOUT_SECONDS, profile_token: nil, renderer: :http, scroll_page: Configuration::DEFAULT_BROWSER_SCROLL_PAGE, timeout_seconds: Configuration::DEFAULT_TIMEOUT_SECONDS, allowed_statuses: Configuration::DEFAULT_ALLOWED_STATUSES)
       @base_url = base_url
       @sitemap_path = sitemap_path
       @rules = Array(rules)
@@ -10,6 +10,7 @@ module Crawlscope
       @browser_factory = browser_factory
       @concurrency = concurrency
       @network_idle_timeout_seconds = network_idle_timeout_seconds
+      @profile_token = profile_token
       @renderer = renderer.to_sym
       @fetch_executor = fetch_executor || default_fetch_executor
       @scroll_page = scroll_page
@@ -49,6 +50,7 @@ module Crawlscope
         adapter: http_adapter,
         concurrency: @concurrency,
         fetch_executor: @fetch_executor,
+        profile_token: @profile_token,
         timeout_seconds: @timeout_seconds
       ).urls(base_url: @base_url)
       raise ValidationError, "No URLs found in sitemap: #{@sitemap_path}" if urls.empty?
@@ -61,6 +63,7 @@ module Crawlscope
         base_url: @base_url,
         timeout_seconds: @timeout_seconds,
         network_idle_timeout_seconds: @network_idle_timeout_seconds,
+        profile_token: @profile_token,
         scroll_page: @scroll_page
       )
     rescue LoadError => error
@@ -71,7 +74,7 @@ module Crawlscope
       if @renderer == :browser
         (@browser_factory || method(:browser)).call
       else
-        Http.new(base_url: @base_url, timeout_seconds: @timeout_seconds, adapter: http_adapter)
+        Http.new(base_url: @base_url, timeout_seconds: @timeout_seconds, adapter: http_adapter, profile_token: @profile_token)
       end
     end
 

@@ -9,11 +9,12 @@ module Crawlscope
   class Sitemap
     SITEMAP_NAMESPACE = {"xmlns" => "http://www.sitemaps.org/schemas/sitemap/0.9"}.freeze
 
-    def initialize(path:, adapter: nil, concurrency: Configuration::DEFAULT_CONCURRENCY, fetch_executor: Configuration::DEFAULT_FETCH_EXECUTOR, timeout_seconds: Configuration::DEFAULT_TIMEOUT_SECONDS)
+    def initialize(path:, adapter: nil, concurrency: Configuration::DEFAULT_CONCURRENCY, fetch_executor: Configuration::DEFAULT_FETCH_EXECUTOR, profile_token: nil, timeout_seconds: Configuration::DEFAULT_TIMEOUT_SECONDS)
       @path = path
       @adapter = adapter
       @concurrency = concurrency
       @fetch_executor = fetch_executor
+      @profile_token = profile_token
       @timeout_seconds = timeout_seconds
     end
 
@@ -34,7 +35,7 @@ module Crawlscope
       end
       return [] if already_visited
 
-      document = Nokogiri::XML(read(source))
+      document = Nokogiri::XML(read(source, base_url: base_url))
       root_name = document.root&.name
       unless %w[sitemapindex urlset].include?(root_name)
         raise ValidationError, "Sitemap #{source} has unexpected root #{root_name.inspect}"
@@ -55,9 +56,16 @@ module Crawlscope
       end
     end
 
-    def read(source)
+    def read(source, base_url:)
       if Url.remote?(source)
-        response = connection.get(source)
+        response = connection.get(source) do |request|
+          RequestHeaders.add_profile_token(
+            request.headers,
+            url: source,
+            base_url: base_url,
+            profile_token: @profile_token
+          )
+        end
         unless response.status.to_i.between?(200, 299)
           raise ValidationError, "Sitemap #{source} returned HTTP #{response.status}"
         end
@@ -92,7 +100,11 @@ module Crawlscope
 
     def connection
       Faraday.new do |faraday|
-        faraday.response :follow_redirects, limit: Http::MAX_REDIRECTS
+        faraday.response(
+          :follow_redirects,
+          limit: Http::MAX_REDIRECTS,
+          callback: RequestHeaders.method(:strip_profile_token_on_cross_origin_redirect)
+        )
         faraday.options.timeout = @timeout_seconds
         faraday.options.open_timeout = @timeout_seconds
         faraday.adapter @adapter if @adapter

@@ -167,6 +167,35 @@ class CrawlscopeCrawlTest < Minitest::Test
     ].sort, result.issues.to_a.map(&:code).uniq.sort
   end
 
+  def test_profile_token_reaches_remote_sitemap_and_page_requests
+    sitemap_request = stub_request(:get, "https://example.com/sitemap.xml")
+      .with(headers: {"X-Profile-Token" => "profile-token"})
+      .to_return(
+        status: 200,
+        body: <<~XML
+          <?xml version="1.0" encoding="UTF-8"?>
+          <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+            <url><loc>https://example.com/about</loc></url>
+          </urlset>
+        XML
+      )
+    page_request = stub_request(:get, "https://example.com/about")
+      .with(headers: {"X-Profile-Token" => "profile-token"})
+      .to_return(status: 200, body: "<html><body>About</body></html>")
+
+    Crawlscope::Crawl.new(
+      base_url: "https://example.com",
+      sitemap_path: "https://example.com/sitemap.xml",
+      rules: [],
+      schema_registry: Crawlscope::SchemaRegistry.default,
+      fetch_executor: :threaded,
+      profile_token: "profile-token"
+    ).call
+
+    assert_requested sitemap_request
+    assert_requested page_request
+  end
+
   def test_uses_browser_when_renderer_is_browser
     File.write(
       @sitemap_path,
