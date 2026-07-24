@@ -44,17 +44,7 @@ module Crawlscope
       value = @configuration.sitemap_path
       return value unless value.to_s.strip.empty?
 
-      local_path = File.expand_path("public/sitemap.xml", Dir.pwd)
-      return local_path if local_path_default?(base_url: base_url) && File.exist?(local_path)
-
       "#{base_url.to_s.chomp("/")}/sitemap.xml"
-    end
-
-    def local_path_default?(base_url:)
-      host = URI.parse(base_url.to_s).host.to_s
-      ["localhost", "127.0.0.1"].include?(host)
-    rescue URI::InvalidURIError
-      false
     end
   end
 end

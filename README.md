@@ -93,6 +93,11 @@ crawlscope validate --url https://example.com --sitemap https://example.com/site
 
 Child sitemap indexes are supported automatically.
 
+Set `CRAWLSCOPE_PROFILE_TOKEN` through the process environment or your secret
+manager when the site protects diagnostic timing with `X-Profile-Token`.
+Crawlscope intentionally has no `--profile-token` flag because command arguments
+can be exposed through shell history and process listings.
+
 Validation output is grouped for terminal scanning:
 
 ```text
@@ -141,9 +146,68 @@ puts result.issues.to_a.map(&:message)
 - `urls`: sitemap URLs selected for validation
 - `pages`: fetched page snapshots
 - `issues`: structured issues with `code`, `severity`, `category`, `url`, and `message`
+- `server_timing_summary`: aggregate response timing data when pages publish it
 
 `result.ok?` returns `false` when an error is present. Warnings and notices
 remain available through `result.issues` without making the result fail.
+
+## Server Timing
+
+Crawlscope parses the
+[`Server-Timing`](https://www.w3.org/TR/server-timing/) response header for both
+HTTP and browser-rendered crawls. Each page exposes its parsed header through
+`page.server_timing`:
+
+```ruby
+page.server_timing.each do |metric|
+  puts [metric.name, metric.duration, metric.description].compact.join(": ")
+end
+```
+
+The validation report adds a `Server Timing` section only when at least one page
+publishes the header. It includes:
+
+- header coverage and the number of pages publishing durations
+- sample and page counts with average, p50, p95, and maximum per metric
+- non-duration signals, including cache status and routing descriptions
+- the ten pages with the largest individual metric
+- the number of malformed entries ignored during parsing
+
+`dur` values are reported as milliseconds, as recommended by the specification.
+Crawlscope does not add durations together because metrics such as `total`,
+`app`, and `db` may overlap. A page's worst-offender entry is its largest
+individual metric instead.
+
+The current HTTP and browser transports expose response headers, not response
+trailers. Metrics published only in a `Server-Timing` trailer are therefore not
+available to Crawlscope.
+
+Rails 8 applications can enable `ActionDispatch::ServerTiming` with:
+
+```ruby
+config.server_timing = true
+```
+
+Applications that expose timing only to authenticated diagnostics can set
+`config.profile_token`. When this value is present, Crawlscope sends it as
+`X-Profile-Token` on same-origin sitemap, HTTP, and browser document requests.
+The header survives same-origin redirects but is removed before a cross-origin
+redirect, and browser subresources never receive it. Keep the token in the host
+application's secret store rather than a URL, command argument, report, or
+checked-in configuration.
+
+`CRAWLSCOPE_PROFILE_TOKEN` is the portable default for Rails, the standalone
+CLI, Rake tasks, and plain Ruby callers. Rails applications may instead assign
+`config.profile_token` from encrypted credentials when that is their established
+secret-management boundary; explicit configuration takes precedence over the
+environment.
+
+New Rails applications enable it in development by default; production remains
+opt-in. Rails publishes the Active Support notification names observed during
+each request and sums repeated events with the same name. The exact metrics
+therefore depend on the application and request, but commonly include controller,
+view, database, and cache instrumentation. Crawlscope accepts Rails' dotted
+metric names and reports each metric independently.
 
 ## Rails Usage
 
@@ -162,10 +226,11 @@ Customize the `Crawlscope.configure` block inside the generated initializer:
 
 ```ruby
 Crawlscope.configure do |config|
-  config.base_url = -> { "https://example.com" }
-  config.sitemap_path = -> { Rails.public_path.join("sitemap.xml").to_s }
-  config.site_name = "Example"
-  config.schema_registry = -> { Crawlscope::SchemaRegistry.default }
+  config.base_url = -> { ENV.fetch("CRAWLSCOPE_BASE_URL", "http://localhost:3000") }
+  config.sitemap_path = lambda {
+    ENV.fetch("SITEMAP", "#{config.base_url.to_s.chomp("/")}/sitemap.xml")
+  }
+  config.site_name = ENV.fetch("CRAWLSCOPE_SITE_NAME", "Application")
 end
 ```
 
@@ -193,6 +258,7 @@ Available environment overrides:
 
 - `URL`
 - `SITEMAP`
+- `CRAWLSCOPE_PROFILE_TOKEN`
 - `RULES=metadata,links`
 - `JS=1` or `RENDERER=browser`
 - `TIMEOUT=30`
@@ -226,10 +292,10 @@ bundle exec rake 'crawlscope:validate:ldjson[https://example.com/article]'
 
 `crawlscope:validate` runs all default sitemap rules: indexability, metadata,
 structured data, uniqueness, content quality, and links. `URL` is the site
-base. Without `SITEMAP`, Crawlscope uses the configured sitemap path, then
-falls back to `/sitemap.xml`. With `SITEMAP`, Crawlscope uses `URL` as the site
-base and validates URLs from that sitemap. `SITEMAP` may be a full URL or a
-local file path.
+base. Without `SITEMAP`, Crawlscope uses the configured sitemap URL, then fetches
+`/sitemap.xml` from `URL` over HTTP. With `SITEMAP`, Crawlscope uses `URL` as
+the site base and validates URLs from that sitemap. `SITEMAP` may be a full URL
+or an explicitly selected local file path.
 
 Plain `rake` does not pass `--url` style flags to tasks. Use `URL=...` or the
 task-argument form above instead.

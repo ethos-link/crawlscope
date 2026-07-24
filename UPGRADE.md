@@ -6,6 +6,34 @@ behavior.
 
 ## Next Release
 
+### Default sitemap is fetched over HTTP
+
+Crawlscope no longer prefers `public/sitemap.xml` when validating a localhost
+application. Without an explicit `SITEMAP` or configured `sitemap_path`, it now
+fetches `/sitemap.xml` from the configured base URL so the crawl observes the
+live application and database state.
+
+The Rails installer now generates the same HTTP default. Regenerate or update
+existing initializers that use `Rails.public_path.join("sitemap.xml")`.
+Explicit local sitemap paths remain supported through `SITEMAP`, `--sitemap`,
+or `config.sitemap_path`.
+
+`CRAWLSCOPE_PROFILE_TOKEN` is now the portable default for standalone CLI, Rake,
+Rails, and plain Ruby usage. Explicit `config.profile_token` values still take
+precedence.
+
+### Server-Timing report output
+
+No host configuration is required. When one or more responses publish a
+`Server-Timing` header, the text report now includes an optional `Server Timing`
+section. Host applications that parse report text should accept this additional
+section.
+
+Parsed metrics are available through `page.server_timing`, and aggregate data is
+available through `result.server_timing_summary`. Crawlscope interprets `dur`
+values as milliseconds and ignores malformed entries while reporting their
+count.
+
 ### Ruby 3.3 is now required
 
 Crawlscope now depends on the current Async runtime for production async HTTP

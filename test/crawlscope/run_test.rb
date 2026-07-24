@@ -130,29 +130,21 @@ class CrawlscopeRunTest < Minitest::Test
     )
   end
 
-  def test_validate_prefers_local_sitemap_for_localhost
+  def test_validate_uses_http_sitemap_for_localhost
     result = FakeResult.new(reported: true)
     configuration = FakeConfiguration.new(result: result, base_url: "http://localhost:3000", sitemap_path: nil)
     reporter = FakeReporter.new
-    tmp_dir = Dir.mktmpdir
-    sitemap_path = File.join(tmp_dir, "public", "sitemap.xml")
-    FileUtils.mkdir_p(File.dirname(sitemap_path))
-    File.write(sitemap_path, "<urlset></urlset>")
 
-    Dir.chdir(tmp_dir) do
-      Crawlscope::Run.new(configuration: configuration, reporter: reporter).validate
-    end
+    Crawlscope::Run.new(configuration: configuration, reporter: reporter).validate
 
     assert_equal(
       {
         base_url: "http://localhost:3000",
-        sitemap_path: sitemap_path,
+        sitemap_path: "http://localhost:3000/sitemap.xml",
         rule_names: nil
       },
       configuration.received_arguments
     )
-  ensure
-    FileUtils.rm_rf(tmp_dir) if tmp_dir
   end
 
   def test_validate_json_ld_reports_valid_structured_data

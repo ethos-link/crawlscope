@@ -5,13 +5,24 @@ require "test_helper"
 class CrawlscopeHttpTest < Minitest::Test
   def test_fetch_parses_html_response
     stub_request(:get, "https://example.com/page")
-      .to_return(status: 200, headers: {"Content-Type" => "text/html"}, body: "<html><body>Hello</body></html>")
+      .to_return(
+        status: 200,
+        headers: {
+          "Content-Type" => "text/html",
+          "Server-Timing" => 'db;dur=12.5;desc="Primary database"'
+        },
+        body: "<html><body>Hello</body></html>"
+      )
 
     page = Crawlscope::Http.new(base_url: "https://example.com", timeout_seconds: 2).fetch("https://example.com/page")
 
     assert_equal 200, page.status
     assert page.html?
     assert_equal "Hello", page.doc.at_css("body").text
+    timing = page.server_timing
+    assert_same timing, page.server_timing
+    assert_equal 12.5, timing.first.duration
+    assert_equal "Primary database", timing.first.description
   end
 
   def test_fetch_parses_responses_without_content_type_as_html
@@ -21,6 +32,54 @@ class CrawlscopeHttpTest < Minitest::Test
     page = Crawlscope::Http.new(base_url: "https://example.com", timeout_seconds: 2).fetch("https://example.com/page")
 
     assert page.html?
+  end
+
+  def test_fetch_sends_profile_token_to_same_origin_requests
+    request = stub_request(:get, "https://example.com/page")
+      .with(headers: {"X-Profile-Token" => "profile-token"})
+      .to_return(status: 200, body: "<html></html>")
+
+    Crawlscope::Http.new(
+      base_url: "https://example.com",
+      timeout_seconds: 2,
+      profile_token: "profile-token"
+    ).fetch("https://example.com/page")
+
+    assert_requested request
+  end
+
+  def test_fetch_preserves_profile_token_on_same_origin_redirects
+    stub_request(:get, "https://example.com/start")
+      .with(headers: {"X-Profile-Token" => "profile-token"})
+      .to_return(status: 302, headers: {"Location" => "/final"})
+    final_request = stub_request(:get, "https://example.com/final")
+      .with(headers: {"X-Profile-Token" => "profile-token"})
+      .to_return(status: 200, body: "<html></html>")
+
+    Crawlscope::Http.new(
+      base_url: "https://example.com",
+      timeout_seconds: 2,
+      profile_token: "profile-token"
+    ).fetch("https://example.com/start")
+
+    assert_requested final_request
+  end
+
+  def test_fetch_removes_profile_token_from_cross_origin_redirects
+    stub_request(:get, "https://example.com/start")
+      .with(headers: {"X-Profile-Token" => "profile-token"})
+      .to_return(status: 302, headers: {"Location" => "https://other.example/final"})
+    final_request = stub_request(:get, "https://other.example/final")
+      .with { |request| !request.headers.key?("X-Profile-Token") }
+      .to_return(status: 200, body: "<html></html>")
+
+    Crawlscope::Http.new(
+      base_url: "https://example.com",
+      timeout_seconds: 2,
+      profile_token: "profile-token"
+    ).fetch("https://example.com/start")
+
+    assert_requested final_request
   end
 
   def test_fetch_leaves_non_html_response_unparsed

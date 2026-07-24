@@ -4,13 +4,15 @@ require "nokogiri"
 
 module Crawlscope
   class Browser
-    def initialize(base_url:, timeout_seconds:, network_idle_timeout_seconds:, scroll_page:)
+    def initialize(base_url:, timeout_seconds:, network_idle_timeout_seconds:, scroll_page:, profile_token: nil)
       @base_url = base_url
       @timeout_seconds = timeout_seconds
       @network_idle_timeout_seconds = network_idle_timeout_seconds
+      @profile_token = profile_token
       @scroll_page = scroll_page
       @browser = build_browser
       @page = @browser.create_page
+      configure_profile_requests
     end
 
     def close
@@ -70,6 +72,21 @@ module Crawlscope
         timeout: @timeout_seconds,
         headers: {"User-Agent" => Http::USER_AGENT}
       )
+    end
+
+    def configure_profile_requests
+      return if @profile_token.to_s.empty?
+
+      @page.network.intercept(resource_type: :document)
+      @page.on(:request) do |request|
+        headers = RequestHeaders.add_profile_token(
+          request.headers.dup,
+          url: request.url,
+          base_url: @base_url,
+          profile_token: @profile_token
+        )
+        request.continue(headers: headers.map { |name, value| {name: name.to_s, value: value.to_s} })
+      end
     end
 
     def scroll_for_render

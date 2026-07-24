@@ -19,5 +19,13 @@ module Crawlscope
     def html?
       !doc.nil?
     end
+
+    def header(name)
+      headers.find { |key, _value| key.to_s.casecmp?(name.to_s) }&.last
+    end
+
+    def server_timing
+      @server_timing ||= ServerTiming.new(header("server-timing"))
+    end
   end
 end

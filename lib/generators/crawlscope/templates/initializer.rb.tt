@@ -14,7 +14,7 @@ module CrawlscopeConfiguration
       Crawlscope.configure do |config|
         config.base_url = -> { ENV.fetch("CRAWLSCOPE_BASE_URL", "http://localhost:3000") }
         config.sitemap_path = lambda {
-          ENV.fetch("SITEMAP", Rails.public_path.join("sitemap.xml").to_s)
+          ENV.fetch("SITEMAP", "#{config.base_url.to_s.chomp("/")}/sitemap.xml")
         }
         config.site_name = ENV.fetch("CRAWLSCOPE_SITE_NAME", "Application")
       end

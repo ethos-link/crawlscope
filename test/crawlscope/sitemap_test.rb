@@ -34,6 +34,27 @@ class CrawlscopeSitemapTest < Minitest::Test
     assert_equal ["https://www.example.com/", "https://www.example.com/pricing"], parser.urls(base_url: "https://www.example.com")
   end
 
+  def test_remote_sitemap_sends_profile_token
+    request = stub_request(:get, "https://www.example.com/sitemap.xml")
+      .with(headers: {"X-Profile-Token" => "profile-token"})
+      .to_return(
+        status: 200,
+        body: <<~XML
+          <?xml version="1.0" encoding="UTF-8"?>
+          <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+            <url><loc>https://www.example.com/</loc></url>
+          </urlset>
+        XML
+      )
+
+    Crawlscope::Sitemap.new(
+      path: "https://www.example.com/sitemap.xml",
+      profile_token: "profile-token"
+    ).urls(base_url: "https://www.example.com")
+
+    assert_requested request
+  end
+
   def test_parses_remote_sitemap_index_with_child_sitemap
     stub_request(:get, "https://www.example.com/sitemap.xml")
       .to_return(
