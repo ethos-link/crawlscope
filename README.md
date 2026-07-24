@@ -93,6 +93,11 @@ crawlscope validate --url https://example.com --sitemap https://example.com/site
 
 Child sitemap indexes are supported automatically.
 
+Set `CRAWLSCOPE_PROFILE_TOKEN` through the process environment or your secret
+manager when the site protects diagnostic timing with `X-Profile-Token`.
+Crawlscope intentionally has no `--profile-token` flag because command arguments
+can be exposed through shell history and process listings.
+
 Validation output is grouped for terminal scanning:
 
 ```text
@@ -191,6 +196,12 @@ redirect, and browser subresources never receive it. Keep the token in the host
 application's secret store rather than a URL, command argument, report, or
 checked-in configuration.
 
+`CRAWLSCOPE_PROFILE_TOKEN` is the portable default for Rails, the standalone
+CLI, Rake tasks, and plain Ruby callers. Rails applications may instead assign
+`config.profile_token` from encrypted credentials when that is their established
+secret-management boundary; explicit configuration takes precedence over the
+environment.
+
 New Rails applications enable it in development by default; production remains
 opt-in. Rails publishes the Active Support notification names observed during
 each request and sums repeated events with the same name. The exact metrics
@@ -215,11 +226,11 @@ Customize the `Crawlscope.configure` block inside the generated initializer:
 
 ```ruby
 Crawlscope.configure do |config|
-  config.base_url = -> { "https://example.com" }
-  config.sitemap_path = -> { Rails.public_path.join("sitemap.xml").to_s }
-  config.profile_token = -> { Rails.application.credentials.dig(:performance, :profile_token) }
-  config.site_name = "Example"
-  config.schema_registry = -> { Crawlscope::SchemaRegistry.default }
+  config.base_url = -> { ENV.fetch("CRAWLSCOPE_BASE_URL", "http://localhost:3000") }
+  config.sitemap_path = lambda {
+    ENV.fetch("SITEMAP", "#{config.base_url.to_s.chomp("/")}/sitemap.xml")
+  }
+  config.site_name = ENV.fetch("CRAWLSCOPE_SITE_NAME", "Application")
 end
 ```
 
@@ -247,6 +258,7 @@ Available environment overrides:
 
 - `URL`
 - `SITEMAP`
+- `CRAWLSCOPE_PROFILE_TOKEN`
 - `RULES=metadata,links`
 - `JS=1` or `RENDERER=browser`
 - `TIMEOUT=30`
@@ -280,10 +292,10 @@ bundle exec rake 'crawlscope:validate:ldjson[https://example.com/article]'
 
 `crawlscope:validate` runs all default sitemap rules: indexability, metadata,
 structured data, uniqueness, content quality, and links. `URL` is the site
-base. Without `SITEMAP`, Crawlscope uses the configured sitemap path, then
-falls back to `/sitemap.xml`. With `SITEMAP`, Crawlscope uses `URL` as the site
-base and validates URLs from that sitemap. `SITEMAP` may be a full URL or a
-local file path.
+base. Without `SITEMAP`, Crawlscope uses the configured sitemap URL, then fetches
+`/sitemap.xml` from `URL` over HTTP. With `SITEMAP`, Crawlscope uses `URL` as
+the site base and validates URLs from that sitemap. `SITEMAP` may be a full URL
+or an explicitly selected local file path.
 
 Plain `rake` does not pass `--url` style flags to tasks. Use `URL=...` or the
 task-argument form above instead.

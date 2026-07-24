@@ -16,11 +16,14 @@ class CrawlscopeInstallGeneratorTest < Minitest::Test
       Crawlscope::Generators::InstallGenerator.start([], destination_root: destination)
 
       initializer = File.join(destination, "config/initializers/crawlscope.rb")
+      initializer_contents = File.read(initializer)
       rakefile = File.read(File.join(destination, "Rakefile"))
 
       assert File.exist?(initializer)
-      assert_includes File.read(initializer), "module CrawlscopeConfiguration"
-      assert_includes File.read(initializer), "CrawlscopeConfiguration.apply if defined?(Crawlscope)"
+      assert_includes initializer_contents, "module CrawlscopeConfiguration"
+      assert_includes initializer_contents, "CrawlscopeConfiguration.apply if defined?(Crawlscope)"
+      assert_includes initializer_contents, "\#{config.base_url.to_s.chomp(\"/\")}/sitemap.xml"
+      refute_includes initializer_contents, "Rails.public_path"
       assert_includes rakefile, 'require "crawlscope/tasks"'
       assert_operator rakefile.index('require "crawlscope/tasks"'), :<, rakefile.index('require_relative "config/application"')
 
@@ -28,14 +31,6 @@ class CrawlscopeInstallGeneratorTest < Minitest::Test
       assert status.success?, stderr
 
       script = <<~RUBY
-        require "pathname"
-
-        module Rails
-          def self.public_path
-            Pathname.new("public")
-          end
-        end
-
         require "crawlscope"
         load ARGV.fetch(0)
 
@@ -43,7 +38,10 @@ class CrawlscopeInstallGeneratorTest < Minitest::Test
         CrawlscopeConfiguration.apply
         abort "configuration replaced" unless Crawlscope.configuration.equal?(configuration)
         abort "base URL missing" unless configuration.base_url == "http://localhost:3000"
-        abort "sitemap missing" unless configuration.sitemap_path == "public/sitemap.xml"
+        abort "sitemap missing" unless configuration.sitemap_path == "http://localhost:3000/sitemap.xml"
+
+        ENV["CRAWLSCOPE_BASE_URL"] = "https://example.com"
+        abort "configured sitemap missing" unless configuration.sitemap_path == "https://example.com/sitemap.xml"
       RUBY
       _stdout, stderr, status = Open3.capture3(
         RbConfig.ruby,

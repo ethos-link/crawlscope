@@ -60,7 +60,7 @@ module Crawlscope
     end
 
     def profile_token
-      resolve(@profile_token)
+      resolve(@profile_token) || ENV["CRAWLSCOPE_PROFILE_TOKEN"]
     end
 
     def renderer
