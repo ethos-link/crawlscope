@@ -6,6 +6,72 @@ behavior.
 
 ## Next Release
 
+### Structured-data length errors include the measured size
+
+String-length schema errors now include an optional `length` field with the
+actual character count. Text reports show the measurement and limit, such as
+`Article.headline: 125 characters; maximum 110`. Existing `field`, `issue`, and
+`type` fields remain available, and `issue` retains the original validator
+message. Applications that enforce exact error-object keys must accept `length`.
+
+### One warning per redirect or canonical mismatch
+
+Sitemap redirects now emit only `sitemap_redirect_url`, rather than also emitting
+`redirected_page`. Applications that match `redirected_page` must switch to
+`sitemap_redirect_url`; `final_url` and final HTTP `status` remain in details.
+
+Metadata and canonical-target checks skip redirect aliases, so the destination's
+canonical is not compared with the redirect's original URL. Metadata checks still
+run when the destination is itself in the crawl.
+
+A directly served page with a different canonical emits one warning:
+`non_canonical_page_in_sitemap` when it is in the sitemap, or `canonical_mismatch`
+otherwise. Applications that previously counted both warnings should handle
+either code as one mismatch.
+
+Metadata length reports put the field and limit in the group heading; rows show
+only the measured length. Server timing's page list now includes only durations
+strictly greater than 50 ms. Aggregate timing statistics still include all
+responses, and `result.server_timing_summary` retains all timing data.
+
+### Redirect URLs are excluded from uniqueness checks
+
+Uniqueness checks now compare only HTML pages whose normalized requested and
+final URLs match. Redirect aliases no longer produce duplicate-title,
+duplicate-description, duplicate-text, or similar-text warnings from the
+destination's content. Redirect issues remain in the crawl report. Separate
+pages that serve identical content without a redirect are still checked.
+
+No host-app configuration changes are required. Applications that count
+uniqueness issues should expect fewer warnings when sitemap URLs redirect.
+
+### Clearer audit messages
+
+Text reports now use plain-language group headings with severity counts and
+show errors before warnings and notices. The repeated category summary is
+removed. Structured-data errors show the type, field, and constraint on separate
+lines (for example, `Article.headline: 125 characters; maximum 110`). Sitemap
+redirects show the destination and its final HTTP status once, without the host
+for same-origin URLs.
+Canonical warnings now identify the canonical target and explain the mismatch.
+Link warnings use `linked from` and `links to` to identify each URL's role.
+Length and ratio warnings include the limit and units. Reports show every issue
+and every related URL on separate lines. Duplicate-title and description values
+are shown in full. Link rules retain all source and target URLs rather than
+three samples. Missing-sitemap issues keep `source_url` and also provide
+`source_urls` with all pages that link to the missing URL. Server timing retains
+full descriptions and lists every page whose duration exceeds 50 ms.
+
+Host applications that parse report text or issue messages must update their
+matching patterns. Prefer issue codes and structured `details` for automation;
+these retain their existing fields, including the original schema errors,
+redirect status and final URL, and canonical href. No configuration changes are
+required.
+
+The former report limits `Reporter::MAX_ISSUES_PER_GROUP` and
+`Rules::Links::MAX_SOURCES_IN_ERROR` are removed. Host applications that reference
+these constants must remove those references.
+
 ### Default sitemap is fetched over HTTP
 
 Crawlscope no longer prefers `public/sitemap.xml` when validating a localhost

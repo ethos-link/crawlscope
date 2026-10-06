@@ -44,7 +44,7 @@ module Crawlscope
           severity: :warning,
           category: :content_quality,
           url: page.url,
-          message: "visible text has low token variety (#{format_ratio(ratio)})",
+          message: "unique words: #{format_percentage(ratio)}; minimum #{format_percentage(@min_unique_token_ratio)}",
           details: {
             ratio: ratio.round(3),
             threshold: @min_unique_token_ratio,
@@ -67,7 +67,7 @@ module Crawlscope
           severity: :warning,
           category: :content_quality,
           url: page.url,
-          message: "low visible text to HTML ratio (#{format_ratio(ratio)})",
+          message: "visible text / HTML bytes: #{format_percentage(ratio)}; minimum #{format_percentage(@min_visible_text_ratio)}",
           details: {
             html_bytes: html_bytes,
             ratio: ratio.round(3),
@@ -86,13 +86,13 @@ module Crawlscope
           severity: :warning,
           category: :content_quality,
           url: page.url,
-          message: "thin visible text (#{word_count} words)",
+          message: "visible words: #{word_count}; minimum #{@min_visible_words}",
           details: {word_count: word_count, minimum: @min_visible_words}
         )
       end
 
-      def format_ratio(value)
-        format("%.2f", value)
+      def format_percentage(value)
+        "#{format("%.3f", value * 100).sub(/0+\z/, "").sub(/\.\z/, "")}%"
       end
     end
   end

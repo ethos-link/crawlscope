@@ -192,7 +192,7 @@ module Crawlscope
           severity: :error,
           category: :sitemaps,
           url: page.url,
-          message: "sitemap URL is noindex",
+          message: "sitemap lists a URL that blocks indexing",
           details: {content: content, source: source}
         )
       end

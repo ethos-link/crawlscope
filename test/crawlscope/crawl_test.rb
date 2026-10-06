@@ -325,6 +325,42 @@ class CrawlscopeCrawlTest < Minitest::Test
     assert_includes result.issues.to_a.map(&:code), :sitemap_redirect_url
   end
 
+  def test_reports_redirects_without_duplicate_destination_content
+    File.write(
+      @sitemap_path,
+      <<~XML
+        <?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url><loc>https://example.com/old</loc></url>
+          <url><loc>https://example.com/alias</loc></url>
+          <url><loc>https://example.com/new</loc></url>
+        </urlset>
+      XML
+    )
+    ["old", "alias"].each do |path|
+      stub_request(:get, "https://example.com/#{path}")
+        .to_return(status: 301, headers: {"Location" => "https://example.com/new"}, body: "")
+    end
+    body = %(<html><head><title>Current page</title><meta name="description" content="Current description"><link rel="canonical" href="https://example.com/new"></head><body>#{"Useful content " * 30}</body></html>)
+    stub_request(:get, "https://example.com/new")
+      .to_return(status: 200, headers: {"Content-Type" => "text/html"}, body: body)
+
+    result = Crawlscope::Crawl.new(
+      base_url: "https://example.com",
+      sitemap_path: @sitemap_path,
+      rules: [Crawlscope::Rules::Uniqueness.new, Crawlscope::Rules::Metadata.new],
+      schema_registry: Crawlscope::SchemaRegistry.default,
+      fetch_executor: :threaded
+    ).call
+
+    assert_equal 3, result.pages.size
+    assert_equal ["https://example.com/old", "https://example.com/alias"], result.issues.select { |issue| issue.code == :sitemap_redirect_url }.map(&:url)
+    refute_includes result.issues.to_a.map(&:code), :redirected_page
+    assert_empty result.issues.select { |issue| issue.category == :uniqueness }
+    assert_empty result.issues.select { |issue| [:canonical_mismatch, :non_canonical_page_in_sitemap].include?(issue.code) }
+    assert_equal 1, result.issues.count { |issue| issue.code == :meta_description_too_short }
+  end
+
   def test_resolves_uncrawled_link_targets_as_a_bounded_batch
     File.write(
       @sitemap_path,

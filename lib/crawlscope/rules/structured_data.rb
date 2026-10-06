@@ -49,7 +49,7 @@ module Crawlscope
               severity: :warning,
               category: :structured_data,
               url: page.url,
-              message: "#{source} parse error: #{data[:message]}",
+              message: "#{source_label(source)} parse error: #{data[:message]}",
               details: {source: source}
             )
             next
@@ -65,12 +65,21 @@ module Crawlscope
             severity: :warning,
             category: :structured_data,
             url: page.url,
-            message: "#{source} schema errors: #{errors.to_json}",
+            message: schema_error_message(source, errors),
             details: {errors: errors, source: source}
           )
         end
 
         validate_job_posting_count(page, items, issues)
+      end
+
+      def source_label(source)
+        (source == "json-ld") ? "JSON-LD" : source
+      end
+
+      def schema_error_message(source, errors)
+        messages = errors.map { |error| Crawlscope::StructuredData::ErrorFormatter.format(error) }
+        "#{source_label(source)} #{messages.join("; ")}"
       end
 
       def validate_job_posting_count(page, items, issues)
@@ -83,7 +92,7 @@ module Crawlscope
             severity: :warning,
             category: :structured_data,
             url: page.url,
-            message: "multiple JobPosting structured data blocks found",
+            message: "JobPosting blocks: #{job_postings.size}; expected 1",
             details: {count: job_postings.size}
           )
         elsif career_detail_page?(page.url)
@@ -107,7 +116,7 @@ module Crawlscope
           severity: :warning,
           category: :structured_data,
           url: page.url,
-          message: "#{source} structured data missing @type",
+          message: "#{source_label(source)} structured data missing @type",
           details: {paths: missing_paths, source: source}
         )
       end

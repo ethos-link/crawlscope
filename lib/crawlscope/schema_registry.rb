@@ -51,11 +51,16 @@ module Crawlscope
       return errors if schema.nil?
 
       JSON::Validator.fully_validate(schema, item, errors_as_objects: true).each do |error|
-        errors << {
+        details = {
           field: error[:fragment].to_s.sub("#/", ""),
           issue: error[:message],
           type: type
         }
+        if %w[MaxLength MinLength].include?(error[:failed_attribute])
+          value = value_at_fragment(item, error[:fragment])
+          details[:length] = value.length if value.is_a?(String)
+        end
+        errors << details
       end
 
       errors
@@ -68,6 +73,17 @@ module Crawlscope
     end
 
     private
+
+    def value_at_fragment(item, fragment)
+      fragment.to_s.delete_prefix("#/").split("/").reduce(item) do |value, key|
+        case value
+        when Hash
+          value[key]
+        when Array
+          value[key.to_i] if key.match?(/\A\d+\z/)
+        end
+      end
+    end
 
     def deep_copy(value)
       case value

@@ -185,7 +185,7 @@ class CrawlscopeRunTest < Minitest::Test
     assert_equal ["https://example.com"], JSON.parse(File.read(report_path)).fetch("results").keys
     assert_includes output.string, "JavaScript mode enabled (Ferrum)"
     assert_includes output.string, "Validating JSON-LD on 1 URL(s)"
-    assert_includes output.string, "All valid!"
+    assert_includes output.string, "Validation: OK"
     assert_includes output.string, "All 1 URLs passed validation."
   ensure
     FileUtils.rm_rf(report_dir) if report_dir

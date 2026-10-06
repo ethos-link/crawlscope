@@ -5,6 +5,8 @@ require "uri"
 module Crawlscope
   class ServerTiming
     class Reporter
+      SLOW_PAGE_THRESHOLD_MS = 50
+
       def initialize(io:)
         @io = io
       end
@@ -22,7 +24,7 @@ module Crawlscope
 
         report_metrics(summary.metrics)
         report_signals(summary.signals)
-        report_worst_pages(summary.worst_pages, base_url: base_url)
+        report_worst_pages(summary.worst_pages(limit: summary.pages.size), base_url: base_url)
         @io.puts("  Ignored malformed entries: #{summary.invalid_count}") if summary.invalid_count.positive?
       end
 
@@ -31,7 +33,7 @@ module Crawlscope
       def report_metrics(metrics)
         return if metrics.empty?
 
-        @io.puts("  Duration metrics (dur; milliseconds assumed):")
+        @io.puts("  Response times (ms):")
         metrics.each do |metric|
           label = metric[:name]
           label += " #{description(metric[:description])}" if metric[:description]
@@ -65,9 +67,10 @@ module Crawlscope
       end
 
       def report_worst_pages(samples, base_url:)
+        samples = samples.select { |sample| sample[:metric].duration > SLOW_PAGE_THRESHOLD_MS }
         return if samples.empty?
 
-        @io.puts("  Worst pages:")
+        @io.puts("  Pages above #{SLOW_PAGE_THRESHOLD_MS} ms:")
         samples.each do |sample|
           metric = sample[:metric]
           detail = metric.description ? " #{description(metric.description)}" : ""
@@ -84,7 +87,6 @@ module Crawlscope
 
       def description(value)
         value = value.to_s
-        value = "#{value[0, 77]}..." if value.length > 80
         value.inspect
       end
 

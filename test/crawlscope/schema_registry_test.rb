@@ -46,6 +46,39 @@ class CrawlscopeSchemaRegistryTest < Minitest::Test
     assert registry.registered?("VideoObject")
   end
 
+  def test_length_errors_include_character_count_without_copying_the_value
+    error = Crawlscope::SchemaRegistry.default.validate({"@type" => "Article", "headline" => "é" * 111}).first
+
+    assert_equal 111, error[:length]
+    assert_equal "headline", error[:field]
+    assert_includes error[:issue], "maximum string length of 110"
+    assert_equal [:field, :issue, :type, :length], error.keys
+  end
+
+  def test_measures_string_fields_inside_nested_arrays
+    schema = {
+      type: "object",
+      properties: {
+        entries: {type: "array", items: {type: "object", properties: {name: {type: "string", maxLength: 3}}}}
+      }
+    }
+    registry = Crawlscope::SchemaRegistry.new(schemas: {"Thing" => schema})
+    errors = registry.validate({"@type" => "Thing", "entries" => [{"name" => "ok"}, {"name" => "éééé"}]})
+
+    assert_equal 1, errors.size
+    assert_equal "entries/1/name", errors.first[:field]
+    assert_equal 4, errors.first[:length]
+  end
+
+  def test_measures_each_graph_items_headline_independently
+    errors = Crawlscope::SchemaRegistry.default.validate({"@graph" => [
+      {"@type" => "Article", "headline" => "a" * 111},
+      {"@type" => "Article", "headline" => "b" * 125}
+    ]})
+
+    assert_equal [111, 125], errors.map { |error| error[:length] }
+  end
+
   def test_web_application_review_requires_review_rating
     errors = Crawlscope::SchemaRegistry.default.validate(
       {

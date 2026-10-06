@@ -67,10 +67,9 @@ module Crawlscope
           @io.puts("• #{extract_path(entry.url)}")
 
           entry.errors.each do |error|
+            @io.puts("    #{source_label(error[:source])}:")
             error[:errors].each do |validation_error|
-              field = validation_error[:field] || validation_error["field"] || "$"
-              issue = validation_error[:issue] || validation_error["issue"] || "Unknown error"
-              @io.puts("    - #{field}: #{issue}")
+              @io.puts("      - #{ErrorFormatter.format(validation_error)}")
             end
           end
         end
@@ -83,9 +82,7 @@ module Crawlscope
       end
 
       def report_entry(entry, debug:)
-        @io.puts("=" * 80)
         @io.puts("URL: #{entry.url}")
-        @io.puts("=" * 80)
 
         if entry.fetch_error
           @io.puts("Error: #{entry.fetch_error}")
@@ -124,18 +121,21 @@ module Crawlscope
 
       def report_validation(entry)
         @io.puts("")
-        @io.puts("Validation results:")
-
         if entry.errors.empty?
-          @io.puts("  All valid!")
+          @io.puts("Validation: OK")
         else
+          @io.puts("Validation: FAILED")
           entry.errors.each do |error|
-            @io.puts("  #{error[:type]}: INVALID [#{error[:source]}]")
+            @io.puts("  #{source_label(error[:source])}:")
             error[:errors].each do |validation_error|
-              @io.puts("    - field: #{validation_error[:field]}, issue: #{validation_error[:issue]}")
+              @io.puts("    - #{ErrorFormatter.format(validation_error)}")
             end
           end
         end
+      end
+
+      def source_label(source)
+        (source == "json-ld") ? "JSON-LD" : source
       end
     end
   end

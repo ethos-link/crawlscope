@@ -66,7 +66,9 @@ module Crawlscope
       end
 
       def summarize_pages(pages)
-        html_pages = pages.select(&:html?)
+        html_pages = pages.select do |page|
+          page.html? && page.normalized_url.to_s == page.normalized_final_url.to_s
+        end
 
         FetchExecutor.map(
           name: @fetch_executor,
@@ -82,7 +84,7 @@ module Crawlscope
             severity: :warning,
             category: :uniqueness,
             url: nil,
-            message: "duplicate title '#{value}' => #{urls.join(", ")}",
+            message: "same title: #{value.inspect}",
             details: {urls: urls, value: value}
           )
         end
@@ -93,7 +95,7 @@ module Crawlscope
             severity: :warning,
             category: :uniqueness,
             url: nil,
-            message: "duplicate meta description '#{value}' => #{urls.join(", ")}",
+            message: "same meta description: #{value.inspect}",
             details: {urls: urls, value: value}
           )
         end
@@ -104,7 +106,7 @@ module Crawlscope
             severity: :warning,
             category: :uniqueness,
             url: nil,
-            message: "duplicate page content fingerprint => #{urls.join(", ")}",
+            message: "same page text",
             details: {urls: urls}
           )
         end
@@ -115,7 +117,7 @@ module Crawlscope
             severity: :warning,
             category: :uniqueness,
             url: nil,
-            message: "duplicate pages without canonical => #{urls.join(", ")}",
+            message: "same page text; at least one page has no canonical link",
             details: {urls: urls}
           )
         end
@@ -144,7 +146,7 @@ module Crawlscope
             severity: :warning,
             category: :uniqueness,
             url: nil,
-            message: "near duplicate scan skipped for #{page_summaries.size} pages",
+            message: "similar-page check skipped: #{page_summaries.size} pages; limit #{@max_near_duplicate_pages}",
             details: {max_pages: @max_near_duplicate_pages, page_count: page_summaries.size}
           )
           return
@@ -164,7 +166,7 @@ module Crawlscope
             severity: :warning,
             category: :uniqueness,
             url: nil,
-            message: "near duplicate page content (#{format("%.2f", similarity)}) => #{urls.join(", ")}",
+            message: "text similarity: #{format("%.1f", similarity * 100)}%; threshold #{format("%.1f", @near_duplicate_threshold * 100)}%",
             details: {similarity: similarity.round(3), threshold: @near_duplicate_threshold, urls: urls}
           )
         end

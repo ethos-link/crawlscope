@@ -44,6 +44,49 @@ class CrawlscopeUniquenessRuleTest < Minitest::Test
     assert_operator issue.details[:similarity], :>=, issue.details[:threshold]
   end
 
+  def test_does_not_report_redirect_aliases_as_duplicate_pages
+    pages = [
+      page(url: "https://example.com/old", final_url: "https://example.com/current"),
+      page(url: "https://example.com/alias", final_url: "https://example.com/current"),
+      page(url: "https://example.com/current")
+    ]
+    issues = Crawlscope::IssueCollection.new
+
+    Crawlscope::Rules::Uniqueness.new.call(urls: pages.map(&:url), pages: pages, issues: issues, context: {})
+
+    assert_empty issues.to_a
+  end
+
+  def test_reports_direct_duplicate_pages_without_including_redirect_aliases
+    pages = [
+      page(url: "https://example.com/old", final_url: "https://example.com/a"),
+      page(url: "https://example.com/a"),
+      page(url: "https://example.com/b")
+    ]
+    issues = Crawlscope::IssueCollection.new
+
+    Crawlscope::Rules::Uniqueness.new.call(urls: pages.map(&:url), pages: pages, issues: issues, context: {})
+
+    assert_equal 4, issues.size
+    issues.each do |issue|
+      assert_equal ["https://example.com/a", "https://example.com/b"], issue.details[:urls]
+    end
+  end
+
+  def test_excludes_redirects_from_near_duplicate_checks_and_scan_limit
+    pages = [
+      page(url: "https://example.com/old", final_url: "https://example.com/other", content: near_duplicate_content("reliable")),
+      page(url: "https://example.com/current", content: near_duplicate_content("dependable"))
+    ]
+
+    [Crawlscope::Rules::Uniqueness.new, Crawlscope::Rules::Uniqueness.new(max_near_duplicate_pages: 1)].each do |rule|
+      issues = Crawlscope::IssueCollection.new
+      rule.call(urls: pages.map(&:url), pages: pages, issues: issues, context: {})
+
+      assert_empty issues.to_a
+    end
+  end
+
   def test_skips_near_duplicate_scan_when_page_count_exceeds_limit
     issues = Crawlscope::IssueCollection.new
     rule = Crawlscope::Rules::Uniqueness.new(max_near_duplicate_pages: 1)
@@ -72,7 +115,7 @@ class CrawlscopeUniquenessRuleTest < Minitest::Test
     TEXT
   end
 
-  def page(url:, content: nil, canonical: nil)
+  def page(url:, content: nil, canonical: nil, final_url: url)
     repeated_text = content || ("Useful content " * 30).strip
     canonical_tag = canonical ? %(<link rel="canonical" href="#{canonical}">) : ""
     body = <<~HTML
@@ -91,8 +134,8 @@ class CrawlscopeUniquenessRuleTest < Minitest::Test
     Crawlscope::Page.new(
       url: url,
       normalized_url: url,
-      final_url: url,
-      normalized_final_url: url,
+      final_url: final_url,
+      normalized_final_url: final_url,
       status: 200,
       headers: {"content-type" => "text/html"},
       body: body,
