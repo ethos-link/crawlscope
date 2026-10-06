@@ -106,20 +106,31 @@ Base URL: https://example.com
 Sitemap: https://example.com/sitemap.xml
 URLs: 24
 Pages: 24
-Status: FAILED
-Issues: 3 3 warnings
+Status: WARNINGS
+Issues: 3 total (3 warnings)
 
-Summary:
-  links            2
-  metadata         1
+Links: Too few incoming links without nofollow (2 warnings)
+  - /pricing  incoming links without nofollow: 1; minimum 2
+      linked from: /
+  - /features  incoming links without nofollow: 1; minimum 2
+      linked from: /
 
-links / low_dofollow_inlinks: 2
-  - /pricing  inbound 1/2  sources: /
-  - /features  inbound 1/2  sources: /
-
-metadata / missing_title: 1
+Metadata: Missing title (1 warning)
   - /draft  missing <title>
 ```
+
+Reports include all issues and related URLs. Errors appear before warnings and
+notices. Each related URL has a label, such as `linked from`, `links to`, or
+`page`. JSON-LD errors appear below the page URL with the type, field, and
+constraint. Same-origin URLs use paths; other URLs retain their scheme and host.
+For automation in Ruby, use `result.issues` and each issue's `code`, `severity`,
+`url`, and `details` rather than matching the report text.
+
+Metadata length limits appear in the group heading; each row shows the measured
+length. The default maximums are 160 characters for a meta description and 110
+characters for an Article JSON-LD `headline`. These are separate Crawlscope
+validation limits for separate fields. Server timing lists pages only when the
+reported duration exceeds 50 ms; aggregate statistics include all responses.
 
 ## Ruby Usage
 

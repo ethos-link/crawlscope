@@ -21,7 +21,7 @@ module Crawlscope
         sitemap_urls = normalized_sitemap_urls(urls)
 
         pages.each do |page|
-          next unless page.html?
+          next unless page.html? && page.normalized_url.to_s == page.normalized_final_url.to_s
 
           validate_h1(page, issues)
           validate_title(page, issues)
@@ -47,7 +47,7 @@ module Crawlscope
             severity: :warning,
             category: :metadata,
             url: page.url,
-            message: "empty <h1>",
+            message: "empty <h1> tags: #{empty_h1s.size}",
             details: {count: empty_h1s.size}
           )
         end
@@ -93,7 +93,7 @@ module Crawlscope
         if title.empty?
           issues.add(code: :missing_title, severity: :warning, category: :metadata, url: page.url, message: "missing <title>", details: {})
         elsif title.length > TITLE_MAX_LENGTH
-          issues.add(code: :title_too_long, severity: :warning, category: :metadata, url: page.url, message: "title too long (#{title.length})", details: {length: title.length})
+          issues.add(code: :title_too_long, severity: :warning, category: :metadata, url: page.url, message: "title: #{title.length} characters; maximum #{TITLE_MAX_LENGTH}", details: {length: title.length})
         elsif repeated_site_name?(title)
           issues.add(code: :title_repeats_site_name, severity: :warning, category: :metadata, url: page.url, message: "title repeats #{@site_name}", details: {site_name: @site_name})
         end
@@ -117,9 +117,9 @@ module Crawlscope
         if description.empty?
           issues.add(code: :missing_meta_description, severity: :warning, category: :metadata, url: page.url, message: "missing meta description", details: {})
         elsif description.length < DESCRIPTION_MIN_LENGTH
-          issues.add(code: :meta_description_too_short, severity: :warning, category: :metadata, url: page.url, message: "meta description too short (#{description.length})", details: {length: description.length, minimum: DESCRIPTION_MIN_LENGTH})
+          issues.add(code: :meta_description_too_short, severity: :warning, category: :metadata, url: page.url, message: "meta description: #{description.length} characters; minimum #{DESCRIPTION_MIN_LENGTH}", details: {length: description.length, minimum: DESCRIPTION_MIN_LENGTH})
         elsif description.length > DESCRIPTION_MAX_LENGTH
-          issues.add(code: :meta_description_too_long, severity: :warning, category: :metadata, url: page.url, message: "meta description too long (#{description.length})", details: {length: description.length})
+          issues.add(code: :meta_description_too_long, severity: :warning, category: :metadata, url: page.url, message: "meta description: #{description.length} characters; maximum #{DESCRIPTION_MAX_LENGTH}", details: {length: description.length})
         end
       end
 
@@ -136,25 +136,25 @@ module Crawlscope
         return if canonical_matches_page?(normalized_canonical, normalized_page_url)
 
         details = {canonical: canonical}
-        issues.add(
-          code: :canonical_mismatch,
-          severity: :warning,
-          category: :metadata,
-          url: page.url,
-          message: "canonical mismatch (#{canonical})",
-          details: details
-        )
-
-        return unless sitemap_urls.include?(normalized_page_url)
-
-        issues.add(
-          code: :non_canonical_page_in_sitemap,
-          severity: :warning,
-          category: :sitemaps,
-          url: page.url,
-          message: "non-canonical page is included in sitemap",
-          details: details
-        )
+        if sitemap_urls.include?(normalized_page_url)
+          issues.add(
+            code: :non_canonical_page_in_sitemap,
+            severity: :warning,
+            category: :sitemaps,
+            url: page.url,
+            message: "sitemap lists this URL, but its canonical points to #{canonical}",
+            details: details
+          )
+        else
+          issues.add(
+            code: :canonical_mismatch,
+            severity: :warning,
+            category: :metadata,
+            url: page.url,
+            message: "canonical points to a different URL: #{canonical}",
+            details: details
+          )
+        end
       end
 
       def repeated_site_name?(title)
@@ -174,7 +174,7 @@ module Crawlscope
           severity: :warning,
           category: :metadata,
           url: page.url,
-          message: "Open Graph tags incomplete (missing #{missing.join(", ")})",
+          message: "missing Open Graph tags: #{missing.join(", ")}",
           details: {missing: missing}
         )
       end

@@ -114,7 +114,6 @@ module Crawlscope
         elsif !@allowed_statuses.include?(page.status)
           issues.add(code: :unexpected_status, severity: :error, category: :crawl, url: page.url, message: "HTTP #{page.status}", details: {status: page.status})
         elsif redirected?(page)
-          issues.add(code: :redirected_page, severity: :warning, category: :crawl, url: page.url, message: "redirects to #{page.final_url}", details: {final_url: page.final_url, status: page.status})
           issues.add(code: :sitemap_redirect_url, severity: :warning, category: :sitemaps, url: page.url, message: "sitemap URL redirects to #{page.final_url}", details: {final_url: page.final_url, status: page.status})
         end
       end

@@ -8,7 +8,6 @@ module Crawlscope
       LINK_SELECTORS = "a[href]"
       INTERNAL_PATH_PREFIXES_TO_SKIP = ["/rails/", "/cdn-cgi/"].freeze
       LINK_SCHEMES_TO_SKIP = ["mailto:", "tel:", "javascript:", "data:"].freeze
-      MAX_SOURCES_IN_ERROR = 3
       MIN_INBOUND_ANCHOR_LINKS = 1
       MIN_DOFOLLOW_INBOUND_LINKS = 2
 
@@ -128,20 +127,20 @@ module Crawlscope
       end
 
       def report_broken_target(target_url, grouped_links, issues, status)
-        source_urls = grouped_links.map { |link| link[:source_url] }.uniq.first(MAX_SOURCES_IN_ERROR)
+        source_urls = grouped_links.map { |link| link[:source_url] }.uniq
         issues.add(
           code: :broken_internal_link,
           severity: :warning,
           category: :links,
           url: target_url,
-          message: "broken internal link (HTTP #{status}, sources: #{source_urls.join(", ")})",
+          message: "linked URL returns HTTP #{status}",
           details: {source_urls: source_urls, status: status}
         )
       end
 
       def validate_nofollow_outgoing_links(links, issues)
         links.select { |link| link[:nofollow] }.group_by { |link| link[:source_url] }.each do |source_url, grouped_links|
-          target_urls = grouped_links.map { |link| link[:target_url] }.uniq.first(MAX_SOURCES_IN_ERROR)
+          target_urls = grouped_links.map { |link| link[:target_url] }.uniq
 
           issues.add(
             code: :nofollow_internal_outlinks,
@@ -156,7 +155,7 @@ module Crawlscope
 
       def validate_http_internal_links(links, issues)
         links.select { |link| link[:http_internal_link] }.group_by { |link| link[:source_url] }.each do |source_url, grouped_links|
-          target_urls = grouped_links.map { |link| link[:target_url] }.uniq.first(MAX_SOURCES_IN_ERROR)
+          target_urls = grouped_links.map { |link| link[:target_url] }.uniq
 
           issues.add(
             code: :http_internal_link,
@@ -170,15 +169,15 @@ module Crawlscope
       end
 
       def report_unresolved_target(target_url, grouped_links, issues, resolution)
-        source_urls = grouped_links.map { |link| link[:source_url] }.uniq.first(MAX_SOURCES_IN_ERROR)
-        suffix = (resolution && resolution[:error]) ? " (#{resolution[:error]})" : ""
+        source_urls = grouped_links.map { |link| link[:source_url] }.uniq
+        suffix = (resolution && resolution[:error]) ? ": #{resolution[:error]}" : ""
 
         issues.add(
           code: :unresolved_internal_link,
           severity: :warning,
           category: :links,
           url: target_url,
-          message: "unable to validate internal link#{suffix} (sources: #{source_urls.join(", ")})",
+          message: "cannot check linked URL#{suffix}",
           details: {error: resolution && resolution[:error], source_urls: source_urls}
         )
       end
@@ -218,13 +217,13 @@ module Crawlscope
       end
 
       def report_redirect_target(target_url, grouped_links, issues, target)
-        source_urls = grouped_links.map { |link| link[:source_url] }.uniq.first(MAX_SOURCES_IN_ERROR)
+        source_urls = grouped_links.map { |link| link[:source_url] }.uniq
         issues.add(
           code: :internal_link_redirects,
           severity: :warning,
           category: :links,
           url: target_url,
-          message: "internal link redirects to #{target.final_url} (sources: #{source_urls.join(", ")})",
+          message: "internal link redirects to #{target.final_url}",
           details: {final_url: target.final_url, source_urls: source_urls, status: target.status}
         )
       end
@@ -361,15 +360,14 @@ module Crawlscope
           report_orphan_page(target_url, issues) if inbound_count.zero?
 
           if inbound_count.positive? && inbound_count < MIN_INBOUND_ANCHOR_LINKS
-            source_samples = sample_sources_by_target[path].first(MAX_SOURCES_IN_ERROR)
-            source_info = source_samples.any? ? " (sources: #{source_samples.join(", ")})" : ""
+            source_samples = sample_sources_by_target[path]
 
             issues.add(
               code: :low_inbound_anchor_links,
               severity: :warning,
               category: :links,
               url: target_url,
-              message: "inbound anchor links #{inbound_count} below #{MIN_INBOUND_ANCHOR_LINKS}#{source_info}",
+              message: "incoming internal links: #{inbound_count}; minimum #{MIN_INBOUND_ANCHOR_LINKS}",
               details: {inbound_count: inbound_count, minimum: MIN_INBOUND_ANCHOR_LINKS, source_urls: source_samples}
             )
           end
@@ -414,7 +412,7 @@ module Crawlscope
           severity: :notice,
           category: :url,
           url: url,
-          message: "URL too long (#{url.length})",
+          message: "URL: #{url.length} characters; maximum 2048",
           details: {length: url.length, maximum: 2_048}
         )
       end
@@ -446,27 +444,22 @@ module Crawlscope
 
       def validate_indexable_pages_missing_from_sitemap(urls, resolved_links, issues)
         sitemap_urls = urls.map { |url| Url.normalize(url, base_url: @base_url) }.compact.to_set
-        reported_urls = Set.new
-
-        resolved_links.each do |link|
-          final_url = link[:final_url]
+        resolved_links.group_by { |link| link[:final_url] }.each do |final_url, grouped_links|
+          link = grouped_links.first
           next if sitemap_urls.include?(final_url)
-          next if reported_urls.include?(final_url)
           next unless crawlable_path?(link[:final_path])
 
           target = target_for(final_url)
           next unless target.allowed?(@allowed_statuses) && target.html?
           next if target.noindex?
 
-          reported_urls << final_url
-
           issues.add(
             code: :indexable_page_missing_from_sitemap,
             severity: :warning,
             category: :sitemaps,
             url: final_url,
-            message: "indexable internal page is missing from sitemap",
-            details: {source_url: link[:source_url]}
+            message: "linked page is missing from sitemap",
+            details: {source_url: link[:source_url], source_urls: grouped_links.map { |entry| entry[:source_url] }.uniq}
           )
         end
       end
@@ -486,15 +479,14 @@ module Crawlscope
         return if dofollow_count.zero?
         return if dofollow_count >= MIN_DOFOLLOW_INBOUND_LINKS
 
-        source_samples = sources_by_target[path].first(MAX_SOURCES_IN_ERROR)
-        source_info = source_samples.any? ? " (sources: #{source_samples.join(", ")})" : ""
+        source_samples = sources_by_target[path]
 
         issues.add(
           code: :low_dofollow_inlinks,
           severity: :warning,
           category: :links,
           url: target_url,
-          message: "dofollow inbound links #{dofollow_count} below #{MIN_DOFOLLOW_INBOUND_LINKS}#{source_info}",
+          message: "incoming internal links without nofollow: #{dofollow_count}; minimum #{MIN_DOFOLLOW_INBOUND_LINKS}",
           details: {dofollow_inbound_count: dofollow_count, minimum: MIN_DOFOLLOW_INBOUND_LINKS, source_urls: source_samples}
         )
       end
@@ -507,8 +499,8 @@ module Crawlscope
           severity: :warning,
           category: :links,
           url: target_url,
-          message: "page has nofollow incoming internal links only",
-          details: {nofollow_inbound_count: nofollow_count, source_urls: nofollow_sources.first(MAX_SOURCES_IN_ERROR)}
+          message: "all incoming internal links use nofollow",
+          details: {nofollow_inbound_count: nofollow_count, source_urls: nofollow_sources}
         )
       end
 
@@ -524,15 +516,17 @@ module Crawlscope
           details: {
             dofollow_inbound_count: dofollow_count,
             nofollow_inbound_count: nofollow_count,
-            dofollow_source_urls: dofollow_sources.first(MAX_SOURCES_IN_ERROR),
-            nofollow_source_urls: nofollow_sources.first(MAX_SOURCES_IN_ERROR)
+            dofollow_source_urls: dofollow_sources,
+            nofollow_source_urls: nofollow_sources
           }
         )
       end
 
       def validate_canonical_targets(urls, pages, resolved_links, issues)
         sitemap_urls = urls.map { |url| Url.normalize(url, base_url: @base_url) }.compact
-        sitemap_pages = pages.select { |page| page.html? && sitemap_urls.include?(page.normalized_url) }
+        sitemap_pages = pages.select do |page|
+          page.html? && sitemap_urls.include?(page.normalized_url) && page.normalized_url.to_s == page.normalized_final_url.to_s
+        end
         return if sitemap_pages.size < 2
 
         dofollow_counts_by_path = dofollow_counts_by_final_path(resolved_links)
@@ -549,7 +543,7 @@ module Crawlscope
               severity: :warning,
               category: :links,
               url: canonical_url,
-              message: "canonical URL has no incoming internal links",
+              message: "canonical URL has no incoming internal links without nofollow",
               details: {source_url: page.url}
             )
           end
@@ -609,7 +603,7 @@ module Crawlscope
             severity: :warning,
             category: :metadata,
             url: page.url,
-            message: "canonical points to redirect",
+            message: "canonical #{canonical_url} redirects to #{target.final_url}",
             details: {canonical: canonical_url, final_url: target.final_url, status: target.status}
           )
         elsif !target.allowed?(@allowed_statuses)
@@ -618,7 +612,7 @@ module Crawlscope
             severity: :warning,
             category: :metadata,
             url: page.url,
-            message: "canonical points to HTTP #{target.status}",
+            message: "canonical #{canonical_url} returns HTTP #{target.status}",
             details: {canonical: canonical_url, status: target.status}
           )
         end

@@ -56,7 +56,7 @@ class CrawlscopeLinksRuleTest < Minitest::Test
     )
 
     assert_includes issues.to_a.map(&:code), :unresolved_internal_link
-    assert_includes issues.to_a.find { |issue| issue.code == :unresolved_internal_link }.message, "unable to validate internal link"
+    assert_includes issues.to_a.find { |issue| issue.code == :unresolved_internal_link }.message, "cannot check linked URL"
   end
 
   def test_ignores_fetch_errors_for_urls_already_crawled
@@ -429,6 +429,42 @@ class CrawlscopeLinksRuleTest < Minitest::Test
     assert_empty issues.to_a
   end
 
+  def test_retains_all_link_sources_and_targets_in_issue_details
+    source_urls = 5.times.map { |index| "https://example.com/source-#{index}" }
+    target_urls = 5.times.map { |index| "https://example.com/target-#{index}" }
+    pages = source_urls.map do |url|
+      targets = target_urls.map { |target| %(<a href="#{target}" rel="nofollow">Target</a>) }.join
+      page(url: url, body: %(<html><body>#{targets}<a href="/missing">Missing</a><a href="/pricing">Pricing</a></body></html>))
+    end
+    resolver = lambda do |url|
+      {crawled: false, error: nil, final_url: url, html: true, status: url.end_with?("/missing") ? 404 : 200}
+    end
+    issues = Crawlscope::IssueCollection.new
+
+    Crawlscope::Rules::Links.new.call(urls: source_urls, pages: pages, issues: issues, context: context(resolver: resolver))
+
+    broken = issues.find { |issue| issue.code == :broken_internal_link }
+    assert_equal source_urls, broken.details[:source_urls]
+    outgoing = issues.select { |issue| issue.code == :nofollow_internal_outlinks }
+    assert_equal 5, outgoing.size
+    outgoing.each { |issue| assert_equal target_urls, issue.details[:target_urls] }
+    missing = issues.find { |issue| issue.code == :indexable_page_missing_from_sitemap && issue.url.end_with?("/pricing") }
+    assert_equal source_urls.first, missing.details[:source_url]
+    assert_equal source_urls, missing.details[:source_urls]
+  end
+
+  def test_does_not_check_destination_canonicals_under_redirect_aliases
+    pages = ["old", "alias"].map do |path|
+      page(url: "https://example.com/#{path}", final_url: "https://example.com/guide", body: '<html><head><link rel="canonical" href="https://example.com/missing"></head></html>')
+    end
+    issues = Crawlscope::IssueCollection.new
+
+    Crawlscope::Rules::Links.new.call(urls: pages.map(&:url), pages: pages, issues: issues, context: context)
+
+    canonical_issues = issues.select { |issue| [:canonical_no_internal_inlinks, :canonical_points_to_redirect, :canonical_points_to_error].include?(issue.code) }
+    assert_empty canonical_issues
+  end
+
   private
 
   def context(resolver: method(:resolve_target))
@@ -439,14 +475,14 @@ class CrawlscopeLinksRuleTest < Minitest::Test
     }
   end
 
-  def page(url:, body:)
+  def page(url:, body:, final_url: url)
     doc = Nokogiri::HTML(body)
 
     Crawlscope::Page.new(
       url: url,
       normalized_url: url,
-      final_url: url,
-      normalized_final_url: url,
+      final_url: final_url,
+      normalized_final_url: final_url,
       status: 200,
       headers: {"content-type" => "text/html"},
       body: body,

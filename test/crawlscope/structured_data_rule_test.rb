@@ -31,6 +31,8 @@ class CrawlscopeStructuredDataRuleTest < Minitest::Test
 
     assert_equal [:structured_data_schema_error], issues.to_a.map(&:code)
     assert_includes issues.to_a.first.message, "headline"
+    assert_equal "JSON-LD Article.headline: is required", issues.to_a.first.message
+    assert_includes issues.to_a.first.details[:errors].first[:issue], "in schema"
   end
 
   def test_reports_parse_errors_for_invalid_json_ld
