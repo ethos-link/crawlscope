@@ -32,7 +32,8 @@ The default rule set includes:
 
 ## Installation
 
-Crawlscope requires Ruby 3.3 or newer.
+Crawlscope requires Ruby 4.0 or newer. Rails is optional; the CLI and Ruby
+library run without it. Rails integration requires host-installed Rails 8.
 
 Add this line to your application's Gemfile:
 
@@ -221,6 +222,10 @@ view, database, and cache instrumentation. Crawlscope accepts Rails' dotted
 metric names and reports each metric independently.
 
 ## Rails Usage
+
+Install Rails 8 in the host application; Crawlscope does not install Railties.
+For a process that loads Crawlscope before Rails, require `crawlscope/rails`
+after Rails is available. The Ruby and CLI entry points remain independent of Rails.
 
 Run the install generator after adding the gem:
 
@@ -432,68 +437,92 @@ That makes `crawlscope` useful as the audit engine while the app remains the own
 
 ## Development
 
-```bash
+Shared development tooling comes from published `ethos-gemkit` 0.1.0. The Gemfile
+and workflow callers use the same release: the gem version is exact, and Actions
+references pin its full commit SHA.
+
+```sh
 git clone https://github.com/ethos-link/crawlscope.git
 cd crawlscope
-
 bundle install
-bundle exec rake test
-bundle exec rake standard
-bundle exec rake
-```
-
-### Git hooks
-
-We use [lefthook](https://lefthook.dev/) with the Ruby
-[commitlint](https://github.com/arandilopez/commitlint) gem to enforce
-Conventional Commits on every commit. We also use
-[Standard Ruby](https://standardrb.com/) to keep code style consistent. CI
-validates commit messages, Standard Ruby, tests, and git-cliff changelog
-generation on pull requests and pushes to main/master.
-
-Run the hook installer once per clone:
-
-```bash
 bundle exec lefthook install
+bundle exec rake verify
 ```
 
-### Install locally
+`rake verify` runs Standard, all Minitest tests, package validation and a git-cliff
+smoke check. `rake` runs the same checks. Individual `rake test` and `rake standard`
+tasks remain available, along with the `crawlscope:*` audit tasks above.
 
-```bash
-rake install
-```
+Hooks use Gemkit to block direct commits to main/master and validate Conventional
+Commits. CI uses the same lint, test, package, changelog and commit checks.
+GitLab sync has no caller because no target URL is configured.
+
+To install a development build locally, run `bundle exec rake install`.
 
 ## Release
 
-Releases are tag-driven and published by GitHub Actions to RubyGems.
-Local release commands never publish directly.
+Use `release:prepare` from clean, up-to-date `main`. It creates a conventional
+release branch and review PR. **Merging the release PR starts publication through
+GitHub Actions**; ordinary development PRs run verification only.
 
-Install [git-cliff](https://git-cliff.org/) locally before preparing a
-release. The release task prepends the next `CHANGELOG.md` section from
-Conventional Commits.
+### RubyGems setup
 
-Before preparing a release, make sure you are on `main` or `master` with a
-clean worktree. If the release contains a breaking public-contract change,
-update `UPGRADE.md` with the host-app migration steps first.
+Configure **crawlscope → Trusted publishers** on RubyGems with these values:
 
-Then run one of:
+| RubyGems field | Value |
+|---|---|
+| Repository owner | `ethos-link` |
+| Repository name | `crawlscope` |
+| Workflow filename | `release.yml` |
+| Environment | `rubygems` |
+| Workflow Repository Owner | `ethos-link` |
+| Workflow Repository Name | `ethos-gemkit` |
 
-```bash
+The Workflow Repository fields are required because the publishing workflow lives
+in Gemkit. Gemkit's own publisher does not authorize Crawlscope. The account ID
+passed by the caller does not create publisher authorization.
+
+Install Git, git-cliff and GitHub CLI, authenticate with `gh auth login`, and
+install hooks as shown above. The `rubygems` GitHub environment must allow main
+and version tags; repository rules must permit the workflow's annotated tags.
+
+### Prepare and publish
+
+Update `UPGRADE.md` with host-app migration steps for contract changes before
+preparing a release. Then run:
+
+```sh
+git switch main
+git pull --ff-only
+bundle install
 bundle exec rake 'release:prepare[patch]'
-bundle exec rake 'release:prepare[minor]'
-bundle exec rake 'release:prepare[major]'
-bundle exec rake 'release:prepare[0.1.0]'
 ```
 
-The task will:
+The default target is `patch`; `minor`, `major` and explicit versions are also
+supported. The task updates the version, changelog and lockfile, verifies the gem,
+commits with hooks enabled, pushes `chore/release-vX.Y.Z` and opens a release PR.
+Review its metadata and notes, and wait for CI before merging.
 
-1. Prepend the next `CHANGELOG.md` section with `git-cliff`.
-1. Update `lib/crawlscope/version.rb`.
-1. Commit the release changes.
-1. Create and push the `vX.Y.Z` tag.
+The workflow verifies and builds the exact release merge commit, creates an
+annotated tag, publishes the same artifact and creates GitHub release notes.
+No local publication or manual tag step is needed. Existing manually pushed
+annotated version tags remain supported.
 
-The `Release` workflow then runs tests, publishes the gem to RubyGems,
-and creates the GitHub release from the changelog entry.
+### Failed publication
+
+If credential setup reports `No trusted publisher configured for this workflow`
+and `gem push` was skipped, correct the publisher fields above and rerun only
+failed jobs in the original run:
+
+```sh
+gh run rerun RUN_ID --repo ethos-link/crawlscope --failed
+```
+
+The existing verified artifact and tag are reused. Do not run `release:prepare`
+again, bump the version or replace the tag to recover from that authentication
+failure. Failed release notes also use a failed-jobs retry without republishing.
+For uploads with uncertain results, already-published versions or expired
+artifacts, follow the [Gemkit recovery guide](https://github.com/ethos-link/ethos-gemkit#failures-and-retries).
 
 ## Contributing
 

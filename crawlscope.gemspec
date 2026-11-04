@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.description = "A small Ruby gem for sitemap-driven SEO validation with structured issues, configurable rules and schema registries, optional browser rendering, and Rails rake task integration."
   spec.homepage = "https://www.ethos-link.com/opensource/crawlscope"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 3.3.0"
+  spec.required_ruby_version = ">= 4.0"
 
   repo = "https://github.com/ethos-link/crawlscope"
   branch = "main"
@@ -29,17 +29,8 @@ Gem::Specification.new do |spec|
     "rubygems_mfa_required" => "true"
   }
 
-  spec.files = Dir.chdir(File.expand_path(__dir__)) do
-    allowed_prefixes = %w[exe/ lib/ test/].freeze
-    allowed_files = %w[CHANGELOG.md LICENSE.txt README.md].freeze
-    git_files = `git ls-files -z 2>/dev/null`.split("\x0")
-    candidate_files = git_files.empty? ? Dir.glob("{lib,test}/**/*", File::FNM_DOTMATCH) + allowed_files : git_files
-
-    candidate_files.select do |file|
-      next false unless File.file?(file)
-
-      allowed_files.include?(file) || allowed_prefixes.any? { |prefix| file.start_with?(prefix) }
-    end.uniq
+  spec.files = Dir.chdir(__dir__) do
+    (Dir["exe/**/*", "lib/**/*", "test/**/*"] + ["CHANGELOG.md", "LICENSE.txt", "README.md", "UPGRADE.md"]).select { |file| File.file?(file) }.uniq.sort
   end
   spec.bindir = "exe"
   spec.executables = ["crawlscope"]
@@ -52,12 +43,9 @@ Gem::Specification.new do |spec|
   spec.add_dependency "faraday-follow_redirects", ">= 0.3"
   spec.add_dependency "json-schema", ">= 5.0"
   spec.add_dependency "nokogiri", ">= 1.16"
-  spec.add_dependency "railties", ">= 7.1"
   spec.add_dependency "zeitwerk", ">= 2.6"
 
   spec.add_development_dependency "minitest", "~> 5.0"
-  spec.add_development_dependency "rake", "~> 13.0"
   spec.add_development_dependency "simplecov", "~> 0.22"
-  spec.add_development_dependency "standard", "~> 1.0"
   spec.add_development_dependency "webmock", "~> 3.0"
 end

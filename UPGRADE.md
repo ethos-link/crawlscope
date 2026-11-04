@@ -4,6 +4,28 @@ Use this file for host-app migration notes when a release changes public
 contracts, required setup, component locals, generated assets, or runtime
 behavior.
 
+## 0.9.0
+
+### Ruby 4 and optional Rails 8
+
+Upgrade Ruby to 4.0 or newer before updating Crawlscope. Rails integrations now
+require Rails 8 (`>= 8.0`, `< 9`). Upgrade the host Rails application when using
+the generator or Railtie; plain Ruby and CLI callers do not need Rails.
+
+Railties is no longer a runtime dependency. Rails applications must declare
+Rails or Railties themselves. If Crawlscope loads before Rails, explicitly
+require `crawlscope/rails` after the framework is available. Existing generated
+initializers and `require "crawlscope/tasks"` loaders remain supported.
+
+### Release preparation
+
+Development uses published Gemkit 0.1.0. Install the bundle and hooks with
+`bundle install` and `bundle exec lefthook install`.
+Run `release:prepare` from current main to open a verified release PR; merging
+that PR triggers workflow publication. Local preparation no longer tags, pushes
+main or bypasses hooks. Configure Crawlscope's RubyGems publisher as documented
+in the README; the shared workflow does not inherit another gem's permission.
+
 ## Next Release
 
 ### Structured-data length errors include the measured size
