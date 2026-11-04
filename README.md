@@ -435,95 +435,6 @@ end
 
 That makes `crawlscope` useful as the audit engine while the app remains the owner of stricter product-specific schema rules.
 
-## Development
-
-Shared development tooling comes from published `ethos-gemkit` 0.1.0. The Gemfile
-and workflow callers use the same release: the gem version is exact, and Actions
-references pin its full commit SHA.
-
-```sh
-git clone https://github.com/ethos-link/crawlscope.git
-cd crawlscope
-bundle install
-bundle exec lefthook install
-bundle exec rake verify
-```
-
-`rake verify` runs Standard, all Minitest tests, package validation and a git-cliff
-smoke check. `rake` runs the same checks. Individual `rake test` and `rake standard`
-tasks remain available, along with the `crawlscope:*` audit tasks above.
-
-Hooks use Gemkit to block direct commits to main/master and validate Conventional
-Commits. CI uses the same lint, test, package, changelog and commit checks.
-GitLab sync has no caller because no target URL is configured.
-
-To install a development build locally, run `bundle exec rake install`.
-
-## Release
-
-Use `release:prepare` from clean, up-to-date `main`. It creates a conventional
-release branch and review PR. **Merging the release PR starts publication through
-GitHub Actions**; ordinary development PRs run verification only.
-
-### RubyGems setup
-
-Configure **crawlscope → Trusted publishers** on RubyGems with these values:
-
-| RubyGems field | Value |
-|---|---|
-| Repository owner | `ethos-link` |
-| Repository name | `crawlscope` |
-| Workflow filename | `release.yml` |
-| Environment | `rubygems` |
-| Workflow Repository Owner | `ethos-link` |
-| Workflow Repository Name | `ethos-gemkit` |
-
-The Workflow Repository fields are required because the publishing workflow lives
-in Gemkit. Gemkit's own publisher does not authorize Crawlscope. The account ID
-passed by the caller does not create publisher authorization.
-
-Install Git, git-cliff and GitHub CLI, authenticate with `gh auth login`, and
-install hooks as shown above. The `rubygems` GitHub environment must allow main
-and version tags; repository rules must permit the workflow's annotated tags.
-
-### Prepare and publish
-
-Update `UPGRADE.md` with host-app migration steps for contract changes before
-preparing a release. Then run:
-
-```sh
-git switch main
-git pull --ff-only
-bundle install
-bundle exec rake 'release:prepare[patch]'
-```
-
-The default target is `patch`; `minor`, `major` and explicit versions are also
-supported. The task updates the version, changelog and lockfile, verifies the gem,
-commits with hooks enabled, pushes `chore/release-vX.Y.Z` and opens a release PR.
-Review its metadata and notes, and wait for CI before merging.
-
-The workflow verifies and builds the exact release merge commit, creates an
-annotated tag, publishes the same artifact and creates GitHub release notes.
-No local publication or manual tag step is needed. Existing manually pushed
-annotated version tags remain supported.
-
-### Failed publication
-
-If credential setup reports `No trusted publisher configured for this workflow`
-and `gem push` was skipped, correct the publisher fields above and rerun only
-failed jobs in the original run:
-
-```sh
-gh run rerun RUN_ID --repo ethos-link/crawlscope --failed
-```
-
-The existing verified artifact and tag are reused. Do not run `release:prepare`
-again, bump the version or replace the tag to recover from that authentication
-failure. Failed release notes also use a failed-jobs retry without republishing.
-For uploads with uncertain results, already-published versions or expired
-artifacts, follow the [Gemkit recovery guide](https://github.com/ethos-link/ethos-gemkit#failures-and-retries).
-
 ## Contributing
 
 1. Fork it
@@ -538,9 +449,31 @@ Please use [Conventional Commits](https://www.conventionalcommits.org/) for comm
 
 MIT License, see [LICENSE.txt](LICENSE.txt)
 
-## About
+## Development and releases
 
-Made by the team at [Ethos Link](https://www.ethos-link.com) — practical software for growing businesses. We build tools for hospitality operators who need clear workflows, fast onboarding, and real human support.
+Use published [Ethos Gemkit](https://github.com/ethos-link/ethos-gemkit) for shared
+tooling. Keep the exact Gemfile version and workflow commit pins on the same release.
 
-We also build [Reviato](https://www.reviato.com), “Capture. Interpret. Act.”.
-Turn guest feedback into clear next steps for your team. Collect private appraisals, spot patterns across reviews, and act before small issues turn into public ones.
+```sh
+bundle install
+bundle exec lefthook install
+bundle exec rake verify
+```
+
+Tests use controlled local fixtures and need no service account. From clean,
+current main, run `bundle exec rake 'release:prepare[patch]'`; review and merge
+the generated PR to publish through Actions. Shared prerequisites, publisher
+settings and failed-job recovery are in the [Gemkit guide](https://github.com/ethos-link/ethos-gemkit#releasing-a-gem).
+
+## Built by Ethos Link
+
+[Ethos Link](https://www.ethos-link.com) builds business software and integrations
+that replace manual handoffs with connected workflows. We help teams automate
+routine work, use their data and improve the processes their business runs on.
+
+- [Reviato](https://www.reviato.com): Read public review trends and collect
+  private customer feedback, so your team can decide what to improve.
+- [EthosPlaces](https://www.ethos.place): Give customers the details they need to
+  choose and visit your business, from opening hours to directions.
+- [Nuntio](https://www.nuntiohq.com): Draft, review and schedule social posts in
+  one workspace, then track each publishing result.

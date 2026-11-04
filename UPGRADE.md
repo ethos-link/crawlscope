@@ -1,5 +1,11 @@
 # Upgrade Guide
 
+## Unreleased
+
+Development and release tooling uses Gemkit 0.2.0. Update the gem and workflow
+pins together; see the [Gemkit upgrade guide](https://github.com/ethos-link/ethos-gemkit/blob/main/UPGRADE.md).
+Runtime APIs are unchanged.
+
 Use this file for host-app migration notes when a release changes public
 contracts, required setup, component locals, generated assets, or runtime
 behavior.
