@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-11-04
+
+### Changed
+
+- Require Ruby 4.0 or newer.
+- Use published Gemkit 0.1.0 for shared verification and release PRs, with workflow callers pinned to the same release commit.
+
+### Added
+
+- Support optional host-installed Rails 8 (`>= 8.0`, `< 9`), including explicit `crawlscope/rails` loading after the core.
+- Reuse all packaged audit tasks in the repository, including indexability and content-quality checks.
+
+### Removed
+
+- Remove Railties as a runtime dependency so the Ruby library and CLI work without Rails.
+- Replace local tagging and hook bypasses with reviewed release PRs published by GitHub Actions.
+
 ## [0.8.1] - 2026-10-06
 
 
