@@ -8,8 +8,9 @@ on:
 permissions:
   contents: write
   id-token: write
+  packages: write
 jobs:
   release:
-    uses: ethos-link/ethos-gemkit/.github/workflows/release.yml@e1be29225c48563f3725edaaca5401639c0de119 # v0.1.0
+    uses: ethos-link/ethos-gemkit/.github/workflows/release.yml@a26cf190e0d727596484be8a7f01c9046c95dd78 # v0.2.0
     with:
       rubygems-owner: '27209'
