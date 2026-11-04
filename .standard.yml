@@ -1,0 +1,16 @@
+ruby_version: "4.0"
+
+plugins:
+  - ethos-gemkit
+
+# Core collections remain plain Ruby; Rails is optional at runtime.
+ignore:
+  - "{lib,test}/**/*.rb":
+    - Rails/Pluck
+  # This task deliberately returns the CLI process status to Rake.
+  - "lib/crawlscope/rake_tasks.rb":
+    - Rails/Exit
+
+  # Summary owns a plain Ruby present? predicate, not Active Support's object API.
+  - "lib/crawlscope/server_timing/reporter.rb":
+    - Rails/Blank
