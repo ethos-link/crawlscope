@@ -460,20 +460,6 @@ bundle exec lefthook install
 bundle exec rake verify
 ```
 
-Tests use controlled local fixtures and need no service account. From clean,
-current main, run `bundle exec rake 'release:prepare[patch]'`; review and merge
-the generated PR to publish through Actions. Shared prerequisites, publisher
-settings and failed-job recovery are in the [Gemkit guide](https://github.com/ethos-link/ethos-gemkit#releasing-a-gem).
-
-## Built by Ethos Link
-
-[Ethos Link](https://www.ethos-link.com) builds business software and integrations
-that replace manual handoffs with connected workflows. We help teams automate
-routine work, use their data and improve the processes their business runs on.
-
-- [Reviato](https://www.reviato.com): Read public review trends and collect
-  private customer feedback, so your team can decide what to improve.
-- [EthosPlaces](https://www.ethos.place): Give customers the details they need to
-  choose and visit your business, from opening hours to directions.
-- [Nuntio](https://www.nuntiohq.com): Draft, review and schedule social posts in
-  one workspace, then track each publishing result.
+Tests use controlled local fixtures and need no service account.
+Release preparation, publication, registry setup and recovery are documented
+in the [Gemkit release guide](https://github.com/ethos-link/ethos-gemkit#releasing-a-gem).
