@@ -1,7 +1,7 @@
 # Crawlscope
 
 [![Gem Version](https://badge.fury.io/rb/crawlscope.svg)](https://badge.fury.io/rb/crawlscope)
-[![Ruby](https://github.com/ethos-link/crawlscope/actions/workflows/ruby.yml/badge.svg)](https://github.com/ethos-link/crawlscope/actions/workflows/ruby.yml)
+[![Commit messages](https://github.com/ethos-link/crawlscope/actions/workflows/commitlint.yml/badge.svg)](https://github.com/ethos-link/crawlscope/actions/workflows/commitlint.yml)
 
 `crawlscope` is a small Ruby gem for sitemap-driven SEO validation.
 
