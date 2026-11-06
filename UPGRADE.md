@@ -37,6 +37,18 @@ in the README; the shared workflow does not inherit another gem's permission.
 
 ## Next Release
 
+### Query links retain their own URL identity
+
+URL normalization now preserves query strings and still removes fragments.
+Resolvers, caches and issue consumers must keep the query string when identifying
+a URL. A filtered page no longer shares a resolution or inbound-link count with
+its unfiltered page.
+
+Nofollow warnings exclude self-links and destinations that explicitly declare
+`noindex` in their response headers or HTML. Other indexable destinations,
+including query URLs, still produce nofollow warnings. Broken and redirected
+links remain checked. No host configuration changes are required.
+
 ### Structured-data length errors include the measured size
 
 String-length schema errors now include an optional `length` field with the

@@ -3,6 +3,10 @@
 require "test_helper"
 
 class CrawlscopeUrlTest < Minitest::Test
+  def test_normalize_preserves_query_strings_and_removes_fragments
+    assert_equal "https://example.com/reviews?rating=1", Crawlscope::Url.normalize("/reviews/?rating=1#results", base_url: "https://example.com")
+  end
+
   def test_normalize_resolves_relative_urls_and_removes_trailing_slash
     assert_equal "https://example.com/pricing", Crawlscope::Url.normalize("/pricing/", base_url: "https://example.com")
   end

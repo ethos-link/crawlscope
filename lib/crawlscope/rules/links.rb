@@ -31,7 +31,7 @@ module Crawlscope
         links = extract_links(pages)
         validate_url_hygiene(urls, links, issues)
         resolved_links = resolve_links(links, issues)
-        validate_nofollow_outgoing_links(links, issues)
+        validate_nofollow_outgoing_links(resolved_links, issues)
         validate_http_internal_links(links, issues)
         validate_pages_with_no_outgoing_links(urls, pages, links, issues)
         validate_indexable_pages_missing_from_sitemap(urls, resolved_links, issues)
@@ -139,7 +139,9 @@ module Crawlscope
       end
 
       def validate_nofollow_outgoing_links(links, issues)
-        links.select { |link| link[:nofollow] }.group_by { |link| link[:source_url] }.each do |source_url, grouped_links|
+        links.select do |link|
+          link[:nofollow] && link[:source_url] != link[:final_url] && !target_for(link[:target_url]).noindex?
+        end.group_by { |link| link[:source_url] }.each do |source_url, grouped_links|
           target_urls = grouped_links.map { |link| link[:target_url] }.uniq
 
           issues.add(
@@ -301,17 +303,17 @@ module Crawlscope
       end
 
       def validate_inbound_counts(urls, pages, resolved_links, issues)
-        sitemap_paths = urls.each_with_object({}) do |url, memo|
+        sitemap_urls = urls.filter_map do |url|
           normalized_url = Url.normalize(url, base_url: @base_url)
           path = Url.path(normalized_url)
           next if path.nil?
           next if skip_internal_path?(path)
 
-          memo[path] = normalized_url
-        end
-        return if sitemap_paths.size < 2
+          normalized_url
+        end.to_set
+        return if sitemap_urls.size < 2
 
-        html_paths = pages.each_with_object(Set.new) do |page, result|
+        html_urls = pages.each_with_object(Set.new) do |page, result|
           next unless page.html?
 
           [page.normalized_url, page.normalized_final_url].compact.each do |url|
@@ -319,7 +321,7 @@ module Crawlscope
             next if path.nil?
             next if skip_internal_path?(path)
 
-            result << path
+            result << url
           end
         end
 
@@ -331,36 +333,37 @@ module Crawlscope
         nofollow_sources_by_target = Hash.new { |hash, key| hash[key] = [] }
 
         resolved_links.each do |link|
-          target_path = link[:final_path]
-          next unless sitemap_paths.key?(target_path)
-          next if link[:source_path] == target_path
+          target_url = link[:final_url]
+          next unless sitemap_urls.include?(target_url)
+          next if target_for(link[:target_url]).noindex?
+          next if link[:source_url] == target_url
 
-          inbound_anchor_counts[target_path] += 1
-          source_samples = sample_sources_by_target[target_path]
+          inbound_anchor_counts[target_url] += 1
+          source_samples = sample_sources_by_target[target_url]
           source_samples << link[:source_url] unless source_samples.include?(link[:source_url])
 
           if link[:nofollow]
-            nofollow_inbound_counts[target_path] += 1
-            nofollow_sources = nofollow_sources_by_target[target_path]
+            nofollow_inbound_counts[target_url] += 1
+            nofollow_sources = nofollow_sources_by_target[target_url]
             nofollow_sources << link[:source_url] unless nofollow_sources.include?(link[:source_url])
           else
-            dofollow_inbound_counts[target_path] += 1
-            dofollow_sources = dofollow_sources_by_target[target_path]
+            dofollow_inbound_counts[target_url] += 1
+            dofollow_sources = dofollow_sources_by_target[target_url]
             dofollow_sources << link[:source_url] unless dofollow_sources.include?(link[:source_url])
           end
         end
 
-        sitemap_paths.each do |path, target_url|
-          next unless html_paths.include?(path)
+        sitemap_urls.each do |target_url|
+          next unless html_urls.include?(target_url)
 
-          inbound_count = inbound_anchor_counts[path]
-          dofollow_count = dofollow_inbound_counts[path]
-          nofollow_count = nofollow_inbound_counts[path]
+          inbound_count = inbound_anchor_counts[target_url]
+          dofollow_count = dofollow_inbound_counts[target_url]
+          nofollow_count = nofollow_inbound_counts[target_url]
 
           report_orphan_page(target_url, issues) if inbound_count.zero?
 
           if inbound_count.positive? && inbound_count < MIN_INBOUND_ANCHOR_LINKS
-            source_samples = sample_sources_by_target[path]
+            source_samples = sample_sources_by_target[target_url]
 
             issues.add(
               code: :low_inbound_anchor_links,
@@ -372,9 +375,9 @@ module Crawlscope
             )
           end
 
-          report_low_dofollow_inlinks(target_url, path, dofollow_count, dofollow_sources_by_target, issues)
-          report_only_nofollow_internal_inlinks(target_url, nofollow_count, dofollow_count, nofollow_sources_by_target[path], issues)
-          report_mixed_follow_internal_inlinks(target_url, nofollow_count, dofollow_count, nofollow_sources_by_target[path], dofollow_sources_by_target[path], issues)
+          report_low_dofollow_inlinks(target_url, dofollow_count, dofollow_sources_by_target, issues)
+          report_only_nofollow_internal_inlinks(target_url, nofollow_count, dofollow_count, nofollow_sources_by_target[target_url], issues)
+          report_mixed_follow_internal_inlinks(target_url, nofollow_count, dofollow_count, nofollow_sources_by_target[target_url], dofollow_sources_by_target[target_url], issues)
         end
       end
 
@@ -475,11 +478,11 @@ module Crawlscope
         )
       end
 
-      def report_low_dofollow_inlinks(target_url, path, dofollow_count, sources_by_target, issues)
+      def report_low_dofollow_inlinks(target_url, dofollow_count, sources_by_target, issues)
         return if dofollow_count.zero?
         return if dofollow_count >= MIN_DOFOLLOW_INBOUND_LINKS
 
-        source_samples = sources_by_target[path]
+        source_samples = sources_by_target[target_url]
 
         issues.add(
           code: :low_dofollow_inlinks,
@@ -529,7 +532,7 @@ module Crawlscope
         end
         return if sitemap_pages.size < 2
 
-        dofollow_counts_by_path = dofollow_counts_by_final_path(resolved_links)
+        dofollow_counts_by_url = dofollow_counts_by_final_url(resolved_links)
         canonical_entries = canonical_entries_for(sitemap_pages)
         @resolved_targets_by_url.merge!(resolve_targets(canonical_entries.map { |entry| entry.fetch(:canonical_url) }))
 
@@ -537,7 +540,7 @@ module Crawlscope
           page = entry.fetch(:page)
           canonical_url = entry.fetch(:canonical_url)
           canonical_path = entry.fetch(:canonical_path)
-          if canonical_path && !root_path?(canonical_path) && dofollow_counts_by_path[canonical_path].zero?
+          if canonical_path && !root_path?(canonical_path) && dofollow_counts_by_url[canonical_url].zero?
             issues.add(
               code: :canonical_no_internal_inlinks,
               severity: :warning,
@@ -570,12 +573,13 @@ module Crawlscope
         end
       end
 
-      def dofollow_counts_by_final_path(resolved_links)
+      def dofollow_counts_by_final_url(resolved_links)
         resolved_links.each_with_object(Hash.new(0)) do |link, counts|
           next if link[:nofollow]
-          next if link[:source_path] == link[:final_path]
+          next if link[:source_url] == link[:final_url]
+          next if target_for(link[:target_url]).noindex?
 
-          counts[link[:final_path]] += 1
+          counts[link[:final_url]] += 1
         end
       end
 
