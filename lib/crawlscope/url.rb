@@ -18,7 +18,8 @@ module Crawlscope
       host = uri.host.to_s
       host = "#{host}:#{uri.port}" if uri.port && uri.port != uri.default_port
 
-      "#{uri.scheme}://#{host}#{normalized_path}"
+      query = uri.query ? "?#{uri.query}" : ""
+      "#{uri.scheme}://#{host}#{normalized_path}#{query}"
     rescue URI::InvalidURIError
       url.to_s
     end

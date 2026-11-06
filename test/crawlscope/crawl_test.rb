@@ -42,6 +42,24 @@ class CrawlscopeCrawlTest < Minitest::Test
     FileUtils.rm_rf(@tmp_dir)
   end
 
+  def test_fetches_nofollow_query_targets_separately_from_cached_sitemap_pages
+    File.write(@sitemap_path, '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://example.com/pricing</loc></url></urlset>')
+    stub_request(:get, "https://example.com/pricing").to_return(
+      headers: {"Content-Type" => "text/html"}, body: '<a href="/pricing?sample=cafe#demo" rel="nofollow">Demo</a>'
+    )
+    filtered = stub_request(:get, "https://example.com/pricing?sample=cafe").to_return(
+      headers: {"Content-Type" => "text/html", "X-Robots-Tag" => "noindex, follow"}, body: "Demo"
+    )
+
+    result = Crawlscope::Crawl.new(
+      base_url: "https://example.com", sitemap_path: @sitemap_path,
+      rules: [Crawlscope::Rules::Links.new], schema_registry: Crawlscope::SchemaRegistry.default
+    ).call
+
+    assert_requested filtered
+    assert_empty result.issues.to_a
+  end
+
   def test_http_renderer_defaults_to_async_executor
     crawl = Crawlscope::Crawl.new(
       base_url: "https://example.com",

@@ -3,6 +3,54 @@
 require "test_helper"
 
 class CrawlscopeLinksRuleTest < Minitest::Test
+  def test_nofollow_controls_do_not_count_as_links_to_the_indexable_page
+    issues = Crawlscope::IssueCollection.new
+    requested = []
+    resolver = lambda do |url|
+      requested << url
+      {crawled: false, error: nil, final_url: url, status: 200, html: true,
+       doc: Nokogiri::HTML('<meta name="robots" content="noindex,follow">')}
+    end
+    pages = [
+      page(url: "https://example.com/guide", body: '<a href="/pricing">Pricing</a><a href="/pricing?sample=cafe#demo" rel="nofollow">Demo</a><a href="/guide" rel="nofollow">Reset</a>'),
+      page(url: "https://example.com/about", body: '<a href="/pricing">Pricing</a>'),
+      page(url: "https://example.com/pricing", body: '<a href="/guide">Guide</a><a href="/about">About</a>')
+    ]
+    Crawlscope::Rules::Links.new.call(urls: pages.map(&:url), pages: pages, issues: issues, context: context(resolver: resolver))
+
+    assert_includes requested, "https://example.com/pricing?sample=cafe"
+    refute_includes issues.map(&:code), :nofollow_internal_outlinks
+    refute_includes issues.map(&:code), :mixed_follow_internal_inlinks
+  end
+
+  def test_still_reports_nofollow_query_links_to_indexable_pages
+    issues = Crawlscope::IssueCollection.new
+    url = "https://example.com/catalog?page=2"
+    Crawlscope::Rules::Links.new.call(
+      urls: [], pages: [page(url: "https://example.com/guide", body: '<a href="/catalog?page=2" rel="nofollow">Next</a>')],
+      issues: issues, context: context(resolver: ->(target) { {crawled: false, final_url: target, status: 200, html: true} })
+    )
+
+    issue = issues.find { |item| item.code == :nofollow_internal_outlinks }
+    assert_equal [url], issue.details[:target_urls]
+  end
+
+  def test_query_variants_have_separate_inbound_link_counts
+    issues = Crawlscope::IssueCollection.new
+    pages = [
+      page(url: "https://example.com/guide", body: '<a href="/catalog?page=2">Next</a><a href="/catalog">Catalog</a>'),
+      page(url: "https://example.com/catalog", body: '<a href="/guide">Guide</a>'),
+      page(url: "https://example.com/catalog?page=2", body: '<a href="/guide">Guide</a>')
+    ]
+    Crawlscope::Rules::Links.new.call(
+      urls: pages.map(&:url), pages: pages, issues: issues,
+      context: context(resolver: ->(target) { {crawled: true, final_url: target, status: 200, html: true} })
+    )
+
+    counts = issues.select { |item| item.code == :low_dofollow_inlinks }.to_h { |item| [item.url, item.details[:dofollow_inbound_count]] }
+    assert_equal({"https://example.com/catalog" => 1, "https://example.com/catalog?page=2" => 1}, counts)
+  end
+
   def test_reports_broken_internal_links
     issues = Crawlscope::IssueCollection.new
     rule = Crawlscope::Rules::Links.new
