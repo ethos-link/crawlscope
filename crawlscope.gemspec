@@ -22,7 +22,7 @@ Gem::Specification.new do |spec|
     "source_code_uri" => repo,
     "bug_tracker_uri" => "#{repo}/issues",
     "changelog_uri" => "#{repo}/blob/#{branch}/CHANGELOG.md",
-    "documentation_uri" => "#{repo}/blob/#{branch}/README.md",
+    "documentation_uri" => spec.homepage,
     "funding_uri" => "https://www.reviato.com/",
     "github_repo" => "ssh://github.com/ethos-link/crawlscope",
     "allowed_push_host" => "https://rubygems.org",
@@ -30,7 +30,7 @@ Gem::Specification.new do |spec|
   }
 
   spec.files = Dir.chdir(__dir__) do
-    (Dir["exe/**/*", "lib/**/*", "test/**/*"] + ["CHANGELOG.md", "LICENSE.txt", "README.md", "UPGRADE.md"]).select { |file| File.file?(file) }.uniq.sort
+    (Dir["exe/**/*", "lib/**/*", "test/**/*"] + ["CHANGELOG.md", "LICENSE.txt", "README.md", "UPGRADE.md", "docs/rails.md", "docs/rules.md", "docs/server-timing.md"]).select { |file| File.file?(file) }.uniq.sort
   end
   spec.bindir = "exe"
   spec.executables = ["crawlscope"]
