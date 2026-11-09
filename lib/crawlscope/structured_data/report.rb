@@ -8,19 +8,19 @@ module Crawlscope
       end
 
       def all_valid?
-        http_errors.empty? && missing_data.empty? && validation_errors.empty?
+        @result.ok?
       end
 
       def failure_count
-        http_errors.size + missing_data.size + validation_errors.size
+        entries.count { |entry| !entry.ok? }
       end
 
       def http_errors
-        entries.select { |entry| entry.fetch_error && entry.status != 200 }
+        entries.select { |entry| entry.failure_kind == :http }
       end
 
       def missing_data
-        entries.select { |entry| entry.status == 200 && !entry.structured_data_found? }
+        entries.select { |entry| entry.failure_kind == :missing_data }
       end
 
       def results
@@ -34,7 +34,7 @@ module Crawlscope
       end
 
       def validation_errors
-        entries.select { |entry| entry.status == 200 && entry.errors.any? }
+        entries.select { |entry| entry.failure_kind == :validation }
       end
 
       private
@@ -44,15 +44,7 @@ module Crawlscope
       end
 
       def result_for(entry)
-        if entry.fetch_error && entry.status == 200
-          {
-            status: entry.status,
-            error: entry.fetch_error,
-            structured_data_found: false,
-            validation_errors: [],
-            json_ld_count: 0
-          }
-        elsif entry.fetch_error
+        if entry.fetch_error
           {
             status: entry.status || "exception",
             error: entry.fetch_error,

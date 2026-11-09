@@ -4,6 +4,18 @@ require "stringio"
 require "test_helper"
 
 class CrawlscopeReporterTest < Minitest::Test
+  def test_reports_images_missing_alt_with_each_image_source
+    output = report_issues(
+      {code: :missing_image_alt, category: :content_quality,
+       message: "images missing alt attributes: 2",
+       details: {count: 2, image_sources: ["https://example.com/photo.jpg", "https://cdn.example.com/logo.svg"]}}
+    )
+
+    assert_includes output, "Content quality: Images missing alt attributes (1 warning)"
+    assert_includes output, "/page  images missing alt attributes: 2"
+    assert_includes output, "      image: /photo.jpg\n      image: https://cdn.example.com/logo.svg"
+  end
+
   def test_reports_ok_result
     io = StringIO.new
     result = Crawlscope::Result.new(

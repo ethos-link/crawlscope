@@ -3,6 +3,27 @@
 require "test_helper"
 
 class CrawlscopeCliTest < Minitest::Test
+  def test_ldjson_missing_data_fails_in_details_summary_json_and_exit_status
+    url = "https://example.com/page?locale=en"
+    stub_request(:get, url).to_return(status: 200, headers: {"Content-Type" => "text/html"}, body: "<h1>No markup</h1>")
+    out = StringIO.new
+    err = StringIO.new
+
+    Dir.mktmpdir do |directory|
+      path = File.join(directory, "report.json")
+      status = Crawlscope::Cli.start(["ldjson", "--url", url, "--summary", "--report-path", path], out: out, err: err)
+
+      assert_equal 1, status
+      assert_empty err.string
+      assert_includes out.string, "Validation: FAILED (no structured data found)"
+      assert_includes out.string, "STATUS: FAILED"
+      assert_includes out.string, "MISSING STRUCTURED DATA (1):"
+      assert_includes out.string, "• #{url}"
+      refute_includes out.string, "Validation: OK"
+      refute JSON.parse(File.read(path))["results"][url]["structured_data_found"]
+    end
+  end
+
   class FakeConfiguration
     attr_accessor :base_url, :concurrency, :fetch_executor, :network_idle_timeout_seconds, :output, :renderer, :timeout_seconds
 

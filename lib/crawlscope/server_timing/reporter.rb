@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "uri"
-
 module Crawlscope
   class ServerTiming
     class Reporter
@@ -71,11 +69,12 @@ module Crawlscope
         return if samples.empty?
 
         @io.puts("  Pages above #{SLOW_PAGE_THRESHOLD_MS} ms:")
+        urls = Reporting::UrlFormatter.new(base_url: base_url)
         samples.each do |sample|
           metric = sample[:metric]
           detail = metric.description ? " #{description(metric.description)}" : ""
           @io.puts(
-            "    #{relative_url(sample[:page].url, base_url: base_url)}: " \
+            "    #{urls.call(sample[:page].url)}: " \
             "#{duration(metric.duration)} (#{metric.name}#{detail})"
           )
         end
@@ -94,16 +93,6 @@ module Crawlscope
         return "0.0%" if denominator.zero?
 
         format("%.1f%%", numerator.fdiv(denominator) * 100)
-      end
-
-      def relative_url(url, base_url:)
-        uri = URI.parse(url)
-        base_uri = URI.parse(base_url)
-        return url unless uri.host == base_uri.host && uri.scheme == base_uri.scheme && uri.port == base_uri.port
-
-        uri.request_uri
-      rescue URI::InvalidURIError
-        url
       end
 
       def pluralize(word, count)

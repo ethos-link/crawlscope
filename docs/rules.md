@@ -40,6 +40,15 @@ Checks:
 - schema validation failures from the configured registry
 - direct URL structured-data audits through `crawlscope:validate:ldjson`
 
+Sitemap and direct URL audits share the same document validator, including
+missing `@type` checks. Direct URL audits treat missing markup as a failure;
+sitemap audits retain their warning severity for structured-data findings.
+
+Job detail pages can opt into an exactly-one-JobPosting policy with
+`Rules::StructuredData.new(job_posting_path: your_path_pattern)` in a custom
+rule registry. No host route patterns are assumed by default. See
+[UPGRADE](../UPGRADE.md) for an example registry configuration.
+
 ## Uniqueness
 
 Checks:
@@ -57,6 +66,8 @@ For larger crawls, exact duplicate checks still run and Crawlscope reports
 
 Checks:
 
+- missing `alt` attributes on `<img>` elements throughout the page, including
+  headers and footers (empty `alt=""` is allowed for decorative images)
 - thin visible text
 - low visible-text-to-HTML ratio
 - low unique-token ratio

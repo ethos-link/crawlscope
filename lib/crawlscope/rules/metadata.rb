@@ -124,14 +124,14 @@ module Crawlscope
       end
 
       def validate_canonical(page, issues, sitemap_urls)
-        canonical = page.doc.at_css('link[rel="canonical"]')&.[]("href").to_s.strip
+        canonical = page.canonical.href
 
         if canonical.empty?
           issues.add(code: :missing_canonical, severity: :warning, category: :metadata, url: page.url, message: "missing canonical link", details: {})
           return
         end
 
-        normalized_canonical = Url.normalize(canonical, base_url: page.url)
+        normalized_canonical = page.canonical.url
         normalized_page_url = Url.normalize(page.url, base_url: page.url)
         return if canonical_matches_page?(normalized_canonical, normalized_page_url)
 

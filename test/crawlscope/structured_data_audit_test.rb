@@ -3,6 +3,34 @@
 require "test_helper"
 
 class CrawlscopeStructuredDataAuditTest < Minitest::Test
+  def test_sitemap_and_direct_audits_agree_on_structured_data_validity
+    cases = [
+      ["<h1>No markup</h1>", :missing_structured_data],
+      ['<script type="application/ld+json">{</script>', :structured_data_parse_error],
+      ['<script type="application/ld+json">{"name":"Untyped"}</script>', :structured_data_missing_type],
+      ['<script type="application/ld+json">{"@type":"WebPage","@graph":[{"name":"Untyped"}]}</script>', :structured_data_missing_type],
+      ['<script type="application/ld+json">{"@type":"Article"}</script>', :structured_data_schema_error],
+      ['<script type="application/ld+json">{"@type":"WebPage","name":"Example"}</script>', nil],
+      ['<div itemscope itemtype="https://schema.org/WebPage"><span itemprop="name">Example</span></div>', nil]
+    ]
+    registry = Crawlscope::SchemaRegistry.default
+    cases.each do |body, expected_code|
+      page = html_page(url: "https://example.com/page", body: body)
+      browser = FakeBrowser.new(page: page)
+      outcome = Crawlscope::StructuredData::Audit.new(browser_factory: -> { browser }, renderer: :browser,
+        schema_registry: registry, timeout_seconds: 20).call(urls: [page.url])
+      issues = Crawlscope::IssueCollection.new
+      Crawlscope::Rules::StructuredData.new.call(urls: [page.url], pages: [page], issues: issues, context: {schema_registry: registry})
+
+      assert_equal expected_code.nil?, outcome.ok?, body
+      assert_equal expected_code ? [expected_code] : [], issues.map(&:code), body
+      assert_equal outcome.ok?, Crawlscope::StructuredData::Report.new(outcome).all_valid?
+      schema_issue = issues.find { |issue| issue.code == :structured_data_schema_error }
+      assert_equal schema_issue.details[:errors], outcome.entries.first.errors.first[:errors] if schema_issue
+      assert browser.closed
+    end
+  end
+
   class FakeBrowser
     attr_reader :closed
 

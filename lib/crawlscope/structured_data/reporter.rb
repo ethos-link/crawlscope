@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "uri"
 require "json"
 
 module Crawlscope
@@ -36,12 +35,6 @@ module Crawlscope
 
       private
 
-      def extract_path(url)
-        URI.parse(url).path
-      rescue URI::InvalidURIError
-        url
-      end
-
       def print_category(name, items)
         return if items.empty?
 
@@ -56,15 +49,15 @@ module Crawlscope
         @io.puts("")
 
         print_category("HTTP ERRORS", report.http_errors) do |entry|
-          @io.puts("• #{extract_path(entry.url)} (#{entry.status}: #{entry.fetch_error})")
+          @io.puts("• #{entry.url} (#{entry.status}: #{entry.fetch_error})")
         end
 
         print_category("MISSING STRUCTURED DATA", report.missing_data) do |entry|
-          @io.puts("• #{extract_path(entry.url)}")
+          @io.puts("• #{entry.url}")
         end
 
         print_category("VALIDATION ERRORS", report.validation_errors) do |entry|
-          @io.puts("• #{extract_path(entry.url)}")
+          @io.puts("• #{entry.url}")
 
           entry.errors.each do |error|
             @io.puts("    #{source_label(error[:source])}:")
@@ -121,7 +114,9 @@ module Crawlscope
 
       def report_validation(entry)
         @io.puts("")
-        if entry.errors.empty?
+        if !entry.structured_data_found?
+          @io.puts("Validation: FAILED (no structured data found)")
+        elsif entry.errors.empty?
           @io.puts("Validation: OK")
         else
           @io.puts("Validation: FAILED")

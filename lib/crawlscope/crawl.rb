@@ -28,7 +28,10 @@ module Crawlscope
       issues = IssueCollection.new
 
       collect(pages, issues)
-      cache(pages)
+      @target_resolver = Crawling::TargetResolver.new(
+        base_url: @base_url, pages: pages,
+        crawler: Crawler.new(page_fetcher: @page_fetcher, concurrency: @concurrency, fetch_executor: @fetch_executor)
+      )
       scan(urls, pages, issues)
 
       Result.new(
@@ -58,24 +61,13 @@ module Crawlscope
       urls
     end
 
-    def browser
-      Browser.new(
-        base_url: @base_url,
-        timeout_seconds: @timeout_seconds,
-        network_idle_timeout_seconds: @network_idle_timeout_seconds,
-        profile_token: @profile_token,
-        scroll_page: @scroll_page
-      )
-    rescue LoadError => error
-      raise ConfigurationError, "Browser rendering requires the ferrum gem (#{error.message})"
-    end
-
     def page
-      if @renderer == :browser
-        (@browser_factory || method(:browser)).call
-      else
-        Http.new(base_url: @base_url, timeout_seconds: @timeout_seconds, adapter: http_adapter, profile_token: @profile_token)
-      end
+      Crawling::FetcherFactory.new(
+        base_url: @base_url, renderer: @renderer, timeout_seconds: @timeout_seconds,
+        browser_factory: @browser_factory, profile_token: @profile_token,
+        network_idle_timeout_seconds: @network_idle_timeout_seconds,
+        scroll_page: @scroll_page, adapter: http_adapter
+      ).call
     end
 
     def http_adapter
@@ -119,20 +111,6 @@ module Crawlscope
       end
     end
 
-    def cache(pages)
-      @pages = {}
-      @targets = {}
-
-      pages.each do |page|
-        cache_page(page)
-      end
-    end
-
-    def cache_page(page)
-      @pages[page.normalized_url] = page unless page.normalized_url.to_s.empty?
-      @pages[page.normalized_final_url] = page unless page.normalized_final_url.to_s.empty?
-    end
-
     def scan(urls, pages, issues)
       @rules.each do |rule|
         rule.call(urls: urls, pages: pages, issues: issues, context: context)
@@ -144,53 +122,7 @@ module Crawlscope
     end
 
     def resolve_all(target_urls)
-      normalized_by_url = Array(target_urls).to_h do |target_url|
-        [target_url, Url.normalize(target_url, base_url: @base_url)]
-      end
-      normalized_urls = normalized_by_url.values.compact.uniq
-      missing_urls = []
-
-      normalized_urls.each do |normalized_url|
-        next if @targets.key?(normalized_url)
-
-        resolved = resolved_page(normalized_url)
-        if resolved
-          @targets[normalized_url] = resolved
-        else
-          missing_urls << normalized_url
-        end
-      end
-
-      fetched_pages(missing_urls).each do |page|
-        normalized_url = Url.normalize(page.url, base_url: @base_url)
-        cache_page(page)
-        @targets[normalized_url] = resolution(page, normalized_url, crawled: false)
-      end
-
-      normalized_by_url.to_h { |target_url, normalized_url| [target_url, @targets[normalized_url]] }
-    end
-
-    def fetched_pages(normalized_urls)
-      return [] if normalized_urls.empty?
-
-      Crawler.new(page_fetcher: @page_fetcher, concurrency: @concurrency, fetch_executor: @fetch_executor).call(normalized_urls)
-    end
-
-    def resolved_page(normalized_url)
-      page = @pages[normalized_url]
-      resolution(page, normalized_url, crawled: true) if page
-    end
-
-    def resolution(page, normalized_url, crawled:)
-      {
-        crawled: crawled,
-        doc: page.doc,
-        error: page.error,
-        final_url: page.normalized_final_url || normalized_url,
-        headers: page.headers,
-        html: page.html?,
-        status: page.status
-      }
+      @target_resolver.call(target_urls)
     end
 
     def redirected?(page)

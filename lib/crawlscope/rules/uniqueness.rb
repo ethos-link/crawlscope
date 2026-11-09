@@ -57,7 +57,7 @@ module Crawlscope
 
         {
           content_fingerprint_digest: content_fingerprint_digest(page.doc),
-          canonical: page.doc.at_css('link[rel="canonical"]')&.[]("href").to_s.strip,
+          canonical: page.canonical.href,
           description: page.doc.at_css('meta[name="description"]')&.[]("content").to_s.strip,
           shingles: shingles_for(tokens),
           title: page.doc.at_css("title")&.text.to_s.strip,

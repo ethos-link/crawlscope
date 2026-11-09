@@ -24,6 +24,7 @@ module Crawlscope
         pages.each do |page|
           next unless page.html?
 
+          validate_image_alt(page, issues)
           validate_visible_words(page, issues)
           validate_visible_text_ratio(page, issues)
           validate_unique_token_ratio(page, issues)
@@ -31,6 +32,23 @@ module Crawlscope
       end
 
       private
+
+      def validate_image_alt(page, issues)
+        images = page.doc.css("img:not([alt])")
+        return if images.empty?
+
+        issues.add(
+          code: :missing_image_alt,
+          severity: :warning,
+          category: :content_quality,
+          url: page.url,
+          message: "images missing alt attributes: #{images.size}",
+          details: {
+            count: images.size,
+            image_sources: images.filter_map { |image| image["src"] }.uniq
+          }
+        )
+      end
 
       def validate_unique_token_ratio(page, issues)
         tokens = DocumentText.tokens(DocumentText.text_for(page.doc))

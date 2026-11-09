@@ -3,6 +3,57 @@
 require "test_helper"
 
 class CrawlscopeContentQualityRuleTest < Minitest::Test
+  def test_reports_missing_image_alt_across_the_whole_page
+    issues = Crawlscope::IssueCollection.new
+    page = page_with(
+      main: '<picture><source srcset="/photo.webp"><img src="/photo.jpg"></picture><img src="/photo.jpg"><img loading="lazy">',
+      extra_markup: '<header><img src="/logo.svg"></header><footer><img src="/footer.svg"></footer>'
+    )
+
+    Crawlscope::Rules::ContentQuality.new.call(urls: [page.url], pages: [page], issues: issues)
+
+    matches = issues.to_a.select { |issue| issue.code == :missing_image_alt }
+    assert_equal 1, matches.size
+    issue = matches.first
+    assert_equal :warning, issue.severity
+    assert_equal :content_quality, issue.category
+    assert_equal page.url, issue.url
+    assert_equal "images missing alt attributes: 5", issue.message
+    assert_equal 5, issue.details[:count]
+    assert_equal ["/logo.svg", "/footer.svg", "/photo.jpg"], issue.details[:image_sources]
+  end
+
+  def test_allows_present_image_alt_attributes_including_decorative_images
+    issues = Crawlscope::IssueCollection.new
+    page = page_with(main: '<img src="/photo.jpg" alt="A mountain"><img src="/decoration.svg" alt=""><img src="/empty.svg" alt>')
+
+    Crawlscope::Rules::ContentQuality.new.call(urls: [page.url], pages: [page], issues: issues)
+
+    refute_includes issues.to_a.map(&:code), :missing_image_alt
+  end
+
+  def test_does_not_report_missing_image_alt_when_there_are_no_images
+    issues = Crawlscope::IssueCollection.new
+    page = page_with(main: "Text only")
+
+    Crawlscope::Rules::ContentQuality.new.call(urls: [page.url], pages: [page], issues: issues)
+
+    refute_includes issues.to_a.map(&:code), :missing_image_alt
+  end
+
+  def test_skips_non_html_pages
+    issues = Crawlscope::IssueCollection.new
+    page = Crawlscope::Page.new(
+      url: "https://example.com/file", normalized_url: "https://example.com/file",
+      final_url: "https://example.com/file", normalized_final_url: "https://example.com/file",
+      status: 200, headers: {}, body: "", doc: nil
+    )
+
+    Crawlscope::Rules::ContentQuality.new.call(urls: [page.url], pages: [page], issues: issues)
+
+    assert_empty issues.to_a
+  end
+
   def test_reports_thin_visible_text_and_low_html_text_ratio
     issues = Crawlscope::IssueCollection.new
     page = page_with(main: "Short page <div>#{"<span></span>" * 500}</div>")
