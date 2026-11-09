@@ -3,11 +3,10 @@
 module Crawlscope
   module Rules
     class StructuredData
-      CAREER_DETAIL_PATH = %r{/careers/[^/]+/?\z}
-
       attr_reader :code
 
-      def initialize
+      def initialize(job_posting_path: nil)
+        @job_posting_path = job_posting_path
         @code = :structured_data
       end
 
@@ -24,8 +23,8 @@ module Crawlscope
       private
 
       def validate_page(page, issues, schema_registry)
-        document = Crawlscope::StructuredData::Document.new(html: page.body)
-        items = document.items
+        validation = Crawlscope::StructuredData::Validator.new(schema_registry: schema_registry).call(html: page.body)
+        items = validation.items
 
         if items.empty?
           issues.add(
@@ -39,38 +38,23 @@ module Crawlscope
           return
         end
 
-        items.each do |item|
-          data = item.data
-          source = item.source
-
-          if data.is_a?(Hash) && data[:error]
-            issues.add(
-              code: :structured_data_parse_error,
-              severity: :warning,
-              category: :structured_data,
-              url: page.url,
-              message: "#{source_label(source)} parse error: #{data[:message]}",
-              details: {source: source}
-            )
-            next
+        validation.findings.each do |finding|
+          details = {source: finding.source}
+          message = case finding.code
+          when :structured_data_parse_error
+            "#{source_label(finding.source)} parse error: #{finding.errors.first[:issue]}"
+          when :structured_data_missing_type
+            details[:paths] = finding.paths
+            "#{source_label(finding.source)} structured data missing @type"
+          else
+            details[:errors] = finding.errors
+            schema_error_message(finding.source, finding.errors)
           end
-
-          validate_type_presence(page, source, data, issues)
-
-          errors = schema_registry.validate(data)
-          next if errors.empty?
-
-          issues.add(
-            code: :structured_data_schema_error,
-            severity: :warning,
-            category: :structured_data,
-            url: page.url,
-            message: schema_error_message(source, errors),
-            details: {errors: errors, source: source}
-          )
+          issues.add(code: finding.code, severity: :warning, category: :structured_data,
+            url: page.url, message: message, details: details)
         end
 
-        validate_job_posting_count(page, items, issues)
+        validate_job_posting_count(page, items, issues) if @job_posting_path && career_detail_page?(page.url)
       end
 
       def source_label(source)
@@ -107,35 +91,6 @@ module Crawlscope
         end
       end
 
-      def validate_type_presence(page, source, data, issues)
-        missing_paths = missing_type_paths(data)
-        return if missing_paths.empty?
-
-        issues.add(
-          code: :structured_data_missing_type,
-          severity: :warning,
-          category: :structured_data,
-          url: page.url,
-          message: "#{source_label(source)} structured data missing @type",
-          details: {paths: missing_paths, source: source}
-        )
-      end
-
-      def missing_type_paths(data, path = "$")
-        return [] unless data.is_a?(Hash)
-
-        paths = []
-        paths << path if data["@type"].to_s.strip.empty?
-
-        if data["@graph"].is_a?(Array)
-          data["@graph"].each_with_index do |entry, index|
-            paths.concat(missing_type_paths(entry, "#{path}.@graph[#{index}]"))
-          end
-        end
-
-        paths
-      end
-
       def structured_data_types(data)
         return [] unless data.is_a?(Hash)
 
@@ -149,7 +104,7 @@ module Crawlscope
       end
 
       def career_detail_page?(url)
-        URI(url).path.match?(CAREER_DETAIL_PATH)
+        URI(url).path.match?(@job_posting_path)
       rescue URI::InvalidURIError
         false
       end

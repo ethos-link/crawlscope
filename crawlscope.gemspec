@@ -30,7 +30,7 @@ Gem::Specification.new do |spec|
   }
 
   spec.files = Dir.chdir(__dir__) do
-    (Dir["exe/**/*", "lib/**/*", "test/**/*"] + ["CHANGELOG.md", "LICENSE.txt", "README.md", "UPGRADE.md", "docs/rails.md", "docs/rules.md", "docs/server-timing.md"]).select { |file| File.file?(file) }.uniq.sort
+    (Dir["exe/**/*", "lib/**/*", "test/**/*"] + ["CHANGELOG.md", "LICENSE.txt", "README.md", "UPGRADE.md", "docs/architecture.md", "docs/rails.md", "docs/rules.md", "docs/server-timing.md"]).select { |file| File.file?(file) }.uniq.sort
   end
   spec.bindir = "exe"
   spec.executables = ["crawlscope"]

@@ -3,6 +3,22 @@
 require "test_helper"
 
 class CrawlscopeLinksRuleTest < Minitest::Test
+  def test_reusing_a_rule_does_not_retain_the_previous_batch_resolver
+    rule = Crawlscope::Rules::Links.new
+    pages = [page(url: "https://example.com/guide", body: '<a href="/missing">Missing</a>')]
+    batch = ->(urls) { urls.to_h { |url| [url, {status: 200, html: true, final_url: url}] } }
+    first_issues = Crawlscope::IssueCollection.new
+    rule.call(urls: [], pages: pages, issues: first_issues, context: context.merge(resolve_targets: batch))
+    refute_includes first_issues.map(&:code), :broken_internal_link
+
+    second_issues = Crawlscope::IssueCollection.new
+    rule.call(urls: [], pages: pages, issues: second_issues, context: context)
+
+    broken = second_issues.find { |issue| issue.code == :broken_internal_link }
+    assert broken
+    assert_equal 404, broken.details[:status]
+  end
+
   def test_nofollow_controls_do_not_count_as_links_to_the_indexable_page
     issues = Crawlscope::IssueCollection.new
     requested = []

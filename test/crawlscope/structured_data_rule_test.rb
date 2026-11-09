@@ -3,6 +3,16 @@
 require "test_helper"
 
 class CrawlscopeStructuredDataRuleTest < Minitest::Test
+  def test_does_not_assume_host_routes_require_job_posting_markup
+    issues = Crawlscope::IssueCollection.new
+    document = page(url: "https://example.com/careers/team", body: '<script type="application/ld+json">{"@type":"WebPage","name":"Our team"}</script>')
+
+    Crawlscope::Rules::StructuredData.new.call(urls: [document.url], pages: [document], issues: issues,
+      context: {schema_registry: Crawlscope::SchemaRegistry.default})
+
+    refute_includes issues.map(&:code), :missing_job_posting
+  end
+
   def test_reports_schema_errors_for_invalid_article_markup
     issues = Crawlscope::IssueCollection.new
     rule = Crawlscope::Rules::StructuredData.new
@@ -203,7 +213,7 @@ class CrawlscopeStructuredDataRuleTest < Minitest::Test
 
   def test_reports_missing_job_posting_for_career_detail_pages
     issues = Crawlscope::IssueCollection.new
-    rule = Crawlscope::Rules::StructuredData.new
+    rule = Crawlscope::Rules::StructuredData.new(job_posting_path: %r{/careers/[^/]+/?\z})
     page = page(
       url: "https://example.com/careers/sales-partner",
       body: <<~HTML

@@ -24,6 +24,10 @@ module Crawlscope
       headers.find { |key, _value| key.to_s.casecmp?(name.to_s) }&.last
     end
 
+    def canonical
+      Documents::Canonical.new(doc: doc, base_url: url)
+    end
+
     def server_timing
       @server_timing ||= ServerTiming.new(header("server-timing"))
     end

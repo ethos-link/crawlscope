@@ -37,6 +37,61 @@ in the README; the shared workflow does not inherit another gem's permission.
 
 ## Next Release
 
+### Shared audit outcomes and internal architecture
+
+Direct structured-data audits now fail when an HTML page has no structured data
+or contains a JSON-LD or microdata item missing `@type`. Detailed output,
+summaries, and CLI/Rake exit status agree on these failures. Summary categories
+also include failures on successful responses other than HTTP 200 and browser
+responses without a status. Non-HTML responses remain successful skips.
+
+Hosts using `validate_json_ld` or `crawlscope ldjson` must add the missing markup
+or type to pass validation. Summary URL rows now retain the full URL, including
+the host and query string; update text parsers that expected path-only rows.
+The JSON report retains its existing shape and includes missing-type errors in
+`validation_errors`.
+
+JobPosting count checks are now opt-in and scoped to a host-supplied path
+pattern. Crawlscope no longer assumes `/careers/...` identifies job detail
+pages or that multiple JobPosting items are invalid on other pages. Hosts that
+need exactly one JobPosting on job detail pages can replace the default rule:
+
+```ruby
+Crawlscope.configure do |config|
+  config.rule_registry = -> {
+    registry = Crawlscope::RuleRegistry.default(site_name: config.site_name)
+    rules = registry.rules.map do |rule|
+      if rule.code == :structured_data
+        Crawlscope::Rules::StructuredData.new(job_posting_path: %r{/careers/[^/]+/?\z})
+      else
+        rule
+      end
+    end
+    Crawlscope::RuleRegistry.new(rules: rules, default_codes: registry.default_codes)
+  }
+end
+```
+
+Use your application's actual job path pattern. The former
+`Rules::StructuredData::CAREER_DETAIL_PATH` constant is removed; pass the pattern
+directly when constructing the rule.
+
+Existing `Crawl`, `Reporter`, rule entry points, issue fields, and
+`StructuredData::Audit::Page` / `Outcome` constructors remain available.
+Internal responsibilities now live under `Crawling`, `Documents`, `Reporting`,
+and `Rules::Links`; see [architecture](docs/architecture.md) for extension points.
+
+### Images missing alt attributes
+
+The default `content_quality` rule now emits one `missing_image_alt` warning per
+HTML page containing `<img>` elements without an `alt` attribute. Empty
+`alt=""` attributes remain valid for decorative images. Details include `count`
+and `image_sources`; text reports list the affected image sources.
+
+No host configuration changes are required. Applications that count warnings or
+fail crawls on warnings should expect this additional check. Add appropriate alt
+text to informative images or `alt=""` to decorative images to resolve warnings.
+
 ### Query links retain their own URL identity
 
 URL normalization now preserves query strings and still removes fragments.

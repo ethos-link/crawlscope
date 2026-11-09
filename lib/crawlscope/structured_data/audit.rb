@@ -3,29 +3,8 @@
 module Crawlscope
   module StructuredData
     class Audit
-      Page = Data.define(:url, :status, :structured_items, :errors, :fetch_error, :content_type, :skipped_reason) do
-        def json_ld_count
-          structured_items.count { |item| item[:source] == "json-ld" }
-        end
-
-        def microdata_count
-          structured_items.count { |item| item[:source] == "microdata" }
-        end
-
-        def ok?
-          fetch_error.nil? && errors.empty?
-        end
-
-        def structured_data_found?
-          skipped_reason == "non-html" || structured_items.any?
-        end
-      end
-
-      Outcome = Data.define(:entries) do
-        def ok?
-          entries.all?(&:ok?)
-        end
-      end
+      Page = Entry
+      Outcome = Crawlscope::StructuredData::Outcome
 
       def initialize(schema_registry:, renderer:, timeout_seconds:, browser_factory: nil, network_idle_timeout_seconds: Configuration::DEFAULT_BROWSER_NETWORK_IDLE_TIMEOUT_SECONDS, scroll_page: Configuration::DEFAULT_BROWSER_SCROLL_PAGE)
         @schema_registry = schema_registry
@@ -47,68 +26,27 @@ module Crawlscope
 
       private
 
-      def build_browser(base_url)
-        browser_factory = @browser_factory
-
-        if browser_factory
-          browser_factory.call
-        else
-          Crawlscope::Browser.new(
-            base_url: base_url,
-            timeout_seconds: @timeout_seconds,
-            network_idle_timeout_seconds: @network_idle_timeout_seconds,
-            scroll_page: @scroll_page
-          )
-        end
-      rescue LoadError => error
-        raise ConfigurationError, "Browser rendering requires the ferrum gem (#{error.message})"
-      end
-
       def build_fetcher(urls)
-        first_url = urls.first.to_s
-        base_url = first_url.empty? ? "http://localhost:3000" : first_url
-
-        if @renderer == :browser
-          build_browser(base_url)
-        else
-          Crawlscope::Http.new(base_url: base_url, timeout_seconds: @timeout_seconds)
-        end
+        Crawling::FetcherFactory.new(
+          base_url: urls.first || "http://localhost:3000", renderer: @renderer,
+          timeout_seconds: @timeout_seconds, browser_factory: @browser_factory,
+          network_idle_timeout_seconds: @network_idle_timeout_seconds,
+          scroll_page: @scroll_page
+        ).call
       end
 
       def build_validation_errors(page)
-        document = Document.new(html: page.body)
-        structured_items = document.items.map do |item|
-          {
-            data: item.data,
-            source: item.source
-          }
+        validation = Validator.new(schema_registry: @schema_registry).call(html: page.body)
+        structured_items = validation.items.map { |item| {data: item.data, source: item.source} }
+        errors = validation.findings.map do |finding|
+          {errors: finding.errors, source: finding.source, type: finding.type}
         end
-
-        errors = structured_items.filter_map do |item|
-          if item[:data].is_a?(Hash) && item[:data][:error]
-            {
-              errors: [{field: "parse", issue: item[:data][:message]}],
-              source: item[:source],
-              type: item[:source]
-            }
-          else
-            schema_errors = @schema_registry.validate(item[:data])
-            next if schema_errors.empty?
-
-            {
-              errors: schema_errors,
-              source: item[:source],
-              type: item[:data]["@type"] || item[:source]
-            }
-          end
-        end
-
         [structured_items, errors]
       end
 
       def validate_url(url, fetcher)
         page = fetcher.fetch(url)
-        content_type = page.headers["content-type"].to_s
+        content_type = page.header("content-type").to_s
 
         if page.error
           Page.new(url: url, status: page.status, structured_items: [], errors: [], fetch_error: page.error, content_type: content_type, skipped_reason: nil)

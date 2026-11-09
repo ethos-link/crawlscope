@@ -3,32 +3,27 @@
 module Crawlscope
   module Rules
     class Indexability
-      ROBOTS_META_SELECTOR = 'meta[name="robots"], meta[name="googlebot"]'
-      X_ROBOTS_TAG_HEADER = "x-robots-tag"
+      ROBOTS_META_SELECTOR = Documents::Robots::ROBOTS_META_SELECTOR
+      X_ROBOTS_TAG_HEADER = Documents::Robots::X_ROBOTS_TAG_HEADER
 
       def self.noindex_header?(headers)
-        noindex?(header_value(headers, X_ROBOTS_TAG_HEADER))
+        Documents::Robots.noindex_header?(headers)
       end
 
       def self.noindex_meta?(doc)
-        return false unless doc
-
-        doc.css(ROBOTS_META_SELECTOR).any? { |tag| noindex?(tag["content"].to_s) }
+        Documents::Robots.noindex_meta?(doc)
       end
 
       def self.header_value(headers, name)
-        headers.find { |key, _value| key.to_s.casecmp?(name) }&.last.to_s
+        Documents::Robots.header_value(headers, name)
       end
 
       def self.directives(value)
-        value
-          .split(",")
-          .map { |directive| directive.split(":", 2).last.to_s.strip }
-          .reject(&:empty?)
+        Documents::Robots.directives(value)
       end
 
       def self.noindex?(value)
-        directives(value).any? { |directive| directive.casecmp?("noindex") || directive.casecmp?("none") }
+        Documents::Robots.new(value).noindex?
       end
 
       attr_reader :code
@@ -65,11 +60,11 @@ module Crawlscope
       end
 
       def follow?(value)
-        directives(value).any? { |directive| directive.casecmp?("follow") }
+        Documents::Robots.new(value).follow?
       end
 
       def nofollow?(value)
-        directives(value).any? { |directive| directive.casecmp?("nofollow") || directive.casecmp?("none") }
+        Documents::Robots.new(value).nofollow?
       end
 
       def validate_meta_robots(page, issues, sitemap_urls)
