@@ -2,6 +2,14 @@
 
 module Crawlscope
   class Schemas
+    # Draft 4 omits date; the native Draft 3 format checks real calendar dates.
+    DATE_OR_DATE_TIME = {
+      anyOf: [
+        {type: "string", format: "date-time"},
+        {"$schema" => "http://json-schema.org/draft-03/schema#", "type" => "string", "format" => "date"}
+      ]
+    }.freeze
+
     FAQ_PAGE = {
       "type" => "object",
       "required" => ["@context", "@type", "mainEntity"],
@@ -123,7 +131,7 @@ module Crawlscope
         :itemReviewed => {type: "object"},
         :reviewRating => RATING,
         :author => {type: ["object", "string"]},
-        :datePublished => {type: "string", format: "date-time"},
+        :datePublished => DATE_OR_DATE_TIME,
         :reviewBody => {type: "string"}
       }
     }.freeze
@@ -136,7 +144,7 @@ module Crawlscope
         :reviewRating => RATING,
         :author => {type: ["object", "string"]},
         :reviewBody => {type: "string"},
-        :datePublished => {type: "string", format: "date-time"}
+        :datePublished => DATE_OR_DATE_TIME
       }
     }.freeze
 

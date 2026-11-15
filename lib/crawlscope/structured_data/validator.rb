@@ -10,9 +10,19 @@ module Crawlscope
         @schema_registry = schema_registry
       end
 
-      def call(html:)
+      def call(html:, required_types: [])
         items = Document.new(html: html).items
-        Validation.new(items: items, findings: items.flat_map { |item| validate(item) })
+        findings = items.flat_map { |item| validate(item) }
+        types = items.flat_map(&:types)
+        Array(required_types).each do |requirement|
+          alternatives = Array(requirement)
+          next if (alternatives & types).any?
+
+          expected = alternatives.join(" or ")
+          findings << Finding.new(code: :structured_data_missing_required_type, source: "page", type: expected,
+            errors: [{field: "@type", issue: "must include #{expected}", expected_types: alternatives}], paths: [])
+        end
+        Validation.new(items: items, findings: findings)
       end
 
       private

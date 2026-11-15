@@ -6,13 +6,14 @@ module Crawlscope
       Page = Entry
       Outcome = Crawlscope::StructuredData::Outcome
 
-      def initialize(schema_registry:, renderer:, timeout_seconds:, browser_factory: nil, network_idle_timeout_seconds: Configuration::DEFAULT_BROWSER_NETWORK_IDLE_TIMEOUT_SECONDS, scroll_page: Configuration::DEFAULT_BROWSER_SCROLL_PAGE)
+      def initialize(schema_registry:, renderer:, timeout_seconds:, browser_factory: nil, network_idle_timeout_seconds: Configuration::DEFAULT_BROWSER_NETWORK_IDLE_TIMEOUT_SECONDS, scroll_page: Configuration::DEFAULT_BROWSER_SCROLL_PAGE, required_types: nil)
         @schema_registry = schema_registry
         @renderer = renderer.to_sym
         @timeout_seconds = timeout_seconds
         @browser_factory = browser_factory
         @network_idle_timeout_seconds = network_idle_timeout_seconds
         @scroll_page = scroll_page
+        @required_types = required_types
       end
 
       def call(urls:)
@@ -36,7 +37,9 @@ module Crawlscope
       end
 
       def build_validation_errors(page)
-        validation = Validator.new(schema_registry: @schema_registry).call(html: page.body)
+        validation = Validator.new(schema_registry: @schema_registry).call(
+          html: page.body, required_types: @required_types ? @required_types.call(page.url) : []
+        )
         structured_items = validation.items.map { |item| {data: item.data, source: item.source} }
         errors = validation.findings.map do |finding|
           {errors: finding.errors, source: finding.source, type: finding.type}
