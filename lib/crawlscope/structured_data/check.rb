@@ -5,6 +5,7 @@ module Crawlscope
     class Check
       def initialize(configuration:)
         @configuration = configuration
+        @required_types = configuration.required_structured_data_types if configuration.respond_to?(:required_structured_data_types)
       end
 
       def call(urls:, debug: false, renderer: @configuration.renderer, timeout_seconds: @configuration.timeout_seconds, report_path: nil, summary: false)
@@ -25,6 +26,7 @@ module Crawlscope
           browser_factory: @configuration.browser_factory,
           network_idle_timeout_seconds: @configuration.network_idle_timeout_seconds,
           renderer: renderer,
+          required_types: @required_types,
           schema_registry: @configuration.schema_registry,
           scroll_page: @configuration.scroll_page?,
           timeout_seconds: timeout_seconds

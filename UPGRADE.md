@@ -37,6 +37,20 @@ in the README; the shared workflow does not inherit another gem's permission.
 
 ## Next Release
 
+### Required structured-data types
+
+Set `config.required_structured_data_types` to a callback accepting a URL and
+returning the types that page must contain. Separate strings require all types;
+nested arrays accept alternatives, such as `[["Article", "BlogPosting",
+"NewsArticle"]]`. The default remains no additional type requirements.
+See [the rule configuration](docs/rules.md#required-types-by-url) for examples.
+
+The default sitemap rule and direct URL audits apply the same requirements.
+Custom rule registries must pass the callback through `required_types:` when
+constructing their structured-data rule. Custom configuration objects supplied
+to `Run` or `StructuredData::Check` can expose `required_structured_data_types`
+to opt in. Existing objects without that optional setting retain their behavior.
+
 ### Shared audit outcomes and internal architecture
 
 Direct structured-data audits now fail when an HTML page has no structured data

@@ -12,6 +12,7 @@ module Crawlscope
     DEFAULT_TIMEOUT_SECONDS = 20
 
     attr_writer :allowed_statuses, :base_url, :browser_factory, :concurrency, :fetch_executor, :network_idle_timeout_seconds, :output, :profile_token, :renderer, :rule_registry, :schema_registry, :scroll_page, :site_name, :sitemap_path, :timeout_seconds
+    attr_accessor :required_structured_data_types
 
     def allowed_statuses
       value = resolve(@allowed_statuses)
@@ -78,7 +79,7 @@ module Crawlscope
       value = resolve(@rule_registry)
       return value unless value.nil?
 
-      RuleRegistry.default(site_name: site_name)
+      RuleRegistry.default(site_name: site_name, required_types: required_structured_data_types)
     end
 
     def audit(base_url: self.base_url, sitemap_path: self.sitemap_path, rule_names: nil)

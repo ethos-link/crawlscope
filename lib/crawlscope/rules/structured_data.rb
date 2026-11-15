@@ -5,8 +5,9 @@ module Crawlscope
     class StructuredData
       attr_reader :code
 
-      def initialize(job_posting_path: nil)
+      def initialize(job_posting_path: nil, required_types: nil)
         @job_posting_path = job_posting_path
+        @required_types = required_types
         @code = :structured_data
       end
 
@@ -23,7 +24,9 @@ module Crawlscope
       private
 
       def validate_page(page, issues, schema_registry)
-        validation = Crawlscope::StructuredData::Validator.new(schema_registry: schema_registry).call(html: page.body)
+        validation = Crawlscope::StructuredData::Validator.new(schema_registry: schema_registry).call(
+          html: page.body, required_types: @required_types ? @required_types.call(page.url) : []
+        )
         items = validation.items
 
         if items.empty?
@@ -46,6 +49,9 @@ module Crawlscope
           when :structured_data_missing_type
             details[:paths] = finding.paths
             "#{source_label(finding.source)} structured data missing @type"
+          when :structured_data_missing_required_type
+            details[:expected_types] = finding.errors.first.fetch(:expected_types)
+            "page missing required structured data: #{finding.type}"
           else
             details[:errors] = finding.errors
             schema_error_message(finding.source, finding.errors)
@@ -67,7 +73,7 @@ module Crawlscope
       end
 
       def validate_job_posting_count(page, items, issues)
-        job_postings = items.select { |item| structured_data_types(item.data).include?("JobPosting") }
+        job_postings = items.select { |item| item.types.include?("JobPosting") }
         return if job_postings.size == 1
 
         if job_postings.size > 1
@@ -89,18 +95,6 @@ module Crawlscope
             details: {expected_type: "JobPosting"}
           )
         end
-      end
-
-      def structured_data_types(data)
-        return [] unless data.is_a?(Hash)
-
-        types = Array(data["@type"]).map(&:to_s)
-
-        if data["@graph"].is_a?(Array)
-          types.concat(data["@graph"].flat_map { |entry| structured_data_types(entry) })
-        end
-
-        types
       end
 
       def career_detail_page?(url)

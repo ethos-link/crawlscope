@@ -6,7 +6,20 @@ require "nokogiri"
 module Crawlscope
   module StructuredData
     class Document
-      Item = Data.define(:source, :data)
+      Item = Data.define(:source, :data) do
+        def types
+          nodes = [data]
+          types = []
+          until nodes.empty?
+            node = nodes.pop
+            next unless node.is_a?(Hash)
+
+            types.concat(Array(node["@type"]))
+            nodes.concat(Array(node["@graph"]))
+          end
+          types
+        end
+      end
 
       def initialize(html:)
         @doc = Nokogiri::HTML(html.to_s)

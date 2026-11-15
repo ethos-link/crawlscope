@@ -44,6 +44,44 @@ Sitemap and direct URL audits share the same document validator, including
 missing `@type` checks. Direct URL audits treat missing markup as a failure;
 sitemap audits retain their warning severity for structured-data findings.
 
+### Required types by URL
+
+Schema validation checks the markup a page contains. To detect a missing type
+even when other valid markup exists, configure a URL policy:
+
+```ruby
+Crawlscope.configure do |config|
+  config.required_structured_data_types = ->(url) {
+    case URI(url).path
+    when %r{\A/guides/[^/]+/?\z}
+      [["Article", "BlogPosting", "NewsArticle"]]
+    when "/guides"
+      ["CollectionPage", "ItemList"]
+    when %r{/benchmark/?\z}
+      ["WebPage", "Dataset"]
+    else
+      []
+    end
+  }
+end
+```
+
+Each string requires that type. A nested array accepts any of its types.
+Return an empty array for URLs without a type requirement. The callback receives
+the full URL; the host owns the route policy and content classification.
+
+The default sitemap rule and direct URL audits use this policy. A missing
+requirement produces `structured_data_missing_required_type` in sitemap
+findings and a validation failure in direct audits, including their reports and
+exit status. Top-level items, JSON-LD type arrays and `@graph` nodes count;
+an article linked inside an ItemList does not satisfy an article-page requirement.
+Microdata items also count. Custom rule registries must pass the callback to
+`Rules::StructuredData.new(required_types: callback)` themselves.
+
+This checks type presence; the schema registry still validates supported types.
+An index, product page or dataset should not acquire Article markup solely
+because an external crawler classified its prose as an article.
+
 Job detail pages can opt into an exactly-one-JobPosting policy with
 `Rules::StructuredData.new(job_posting_path: your_path_pattern)` in a custom
 rule registry. No host route patterns are assumed by default. See

@@ -9,12 +9,12 @@ module Crawlscope
       @default_codes = Array(default_codes).map(&:to_sym)
     end
 
-    def self.default(site_name: nil)
+    def self.default(site_name: nil, required_types: nil)
       new(
         rules: [
           Rules::Indexability.new,
           Rules::Metadata.new(site_name: site_name),
-          Rules::StructuredData.new,
+          Rules::StructuredData.new(required_types: required_types),
           Rules::Uniqueness.new,
           Rules::ContentQuality.new,
           Rules::Links.new

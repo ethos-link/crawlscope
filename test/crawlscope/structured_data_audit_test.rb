@@ -3,6 +3,38 @@
 require "test_helper"
 
 class CrawlscopeStructuredDataAuditTest < Minitest::Test
+  def test_required_types_are_checked_by_sitemap_and_direct_audits
+    required_types = ->(url) { URI(url).path.start_with?("/guides/") ? [["Article", "BlogPosting", "NewsArticle"]] : [] }
+    cases = [
+      ["/guides/test", {"@type" => "WebPage"}, false],
+      ["/features/test", {"@type" => "WebPage"}, true],
+      ["/guides/test", {"@graph" => [{"@type" => "BlogPosting", "headline" => "A guide"}], "@type" => "WebPage"}, true],
+      ["/guides/test", {"@type" => ["WebPage", "Article"], "headline" => "A guide"}, true],
+      ["/guides/test", {"@type" => "ItemList", "itemListElement" => [{"@type" => "Article", "headline" => "Another guide"}]}, false]
+    ]
+
+    cases.each do |path, data, expected_ok|
+      page = html_page(url: "https://example.com#{path}", body: %(<script type="application/ld+json">#{JSON.generate(data)}</script>))
+      browser = FakeBrowser.new(page: page)
+      config = Crawlscope::Configuration.new
+      config.browser_factory = -> { -> { browser } }
+      config.renderer = :browser
+      config.output = StringIO.new
+      config.required_structured_data_types = required_types
+      outcome = Crawlscope::StructuredData::Check.new(configuration: config).call(urls: [page.url])
+      issues = Crawlscope::IssueCollection.new
+      config.rule_registry.rules_for([:structured_data]).first.call(urls: [page.url], pages: [page], issues: issues,
+        context: {schema_registry: config.schema_registry})
+
+      assert_equal expected_ok, outcome.ok?, data.inspect
+      assert_equal expected_ok ? [] : [:structured_data_missing_required_type], issues.map(&:code), data.inspect
+      unless expected_ok
+        assert_equal "page", outcome.entries.first.errors.first.fetch(:source)
+        assert_equal "Article or BlogPosting or NewsArticle", outcome.entries.first.errors.first.fetch(:type)
+      end
+    end
+  end
+
   def test_sitemap_and_direct_audits_agree_on_structured_data_validity
     cases = [
       ["<h1>No markup</h1>", :missing_structured_data],
