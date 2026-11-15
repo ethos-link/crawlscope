@@ -3,6 +3,28 @@
 require "test_helper"
 
 class CrawlscopeSchemaRegistryTest < Minitest::Test
+  def test_review_publication_accepts_dates_and_timestamps
+    ["2026-09-16", "2026-09-16T12:30:00Z"].each do |published|
+      review = {"@type" => "Review", "datePublished" => published, "reviewRating" => {"@type" => "Rating", "ratingValue" => 5}}
+      items = [review.merge("itemReviewed" => {"@type" => "SoftwareApplication", "name" => "Example"})]
+      items.concat(%w[SoftwareApplication WebApplication Product].map { |type| {"@type" => type, "name" => "Example", "review" => review} })
+
+      items.each do |item|
+        assert_empty Crawlscope::SchemaRegistry.default.validate(item), item.inspect
+      end
+    end
+  end
+
+  def test_review_publication_rejects_invalid_calendar_dates
+    ["2026-02-30", "2026-13-01", "not a date"].each do |published|
+      review = {"@type" => "Review", "datePublished" => published, "reviewRating" => {"@type" => "Rating", "ratingValue" => 5}}
+      [review.merge("itemReviewed" => {"@type" => "SoftwareApplication"}),
+        {"@type" => "SoftwareApplication", "name" => "Example", "review" => review}].each do |item|
+        assert Crawlscope::SchemaRegistry.default.validate(item).any? { |error| error.fetch(:field).end_with?("datePublished") }, item.inspect
+      end
+    end
+  end
+
   def test_registers_and_fetches_schema_by_type
     registry = Crawlscope::SchemaRegistry.default
     schema = {"type" => "object"}

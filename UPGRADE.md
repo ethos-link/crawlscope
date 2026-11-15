@@ -37,6 +37,13 @@ in the README; the shared workflow does not inherit another gem's permission.
 
 ## Next Release
 
+### Review publication dates
+
+Standalone and nested reviews now accept a date (`2026-09-16`) or timestamp for
+`datePublished`, matching [Schema.org's Date or DateTime contract](https://schema.org/datePublished).
+Invalid calendar dates still fail validation. Hosts no longer need to invent a
+time to validate a review whose source publishes only its date.
+
 ### Required structured-data types
 
 Set `config.required_structured_data_types` to a callback accepting a URL and
